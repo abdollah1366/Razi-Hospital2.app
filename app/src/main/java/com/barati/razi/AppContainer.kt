@@ -1,0 +1,55 @@
+package com.barati.razi
+
+import android.content.Context
+import android.os.Build
+import com.barati.razi.core.data.ContentRepository
+import com.barati.razi.core.data.DataStoreKeyValueStore
+import com.barati.razi.core.data.DefaultAuthRepository
+import com.barati.razi.core.data.IncidentRepository
+import com.barati.razi.core.data.Keys
+import com.barati.razi.core.network.HttpFactory
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+
+/** وابستگی‌های اپ؛ تزریق دستی برای سادگی (بدون Hilt). */
+class AppContainer(context: Context) {
+    private val appContext = context.applicationContext
+    val scope = CoroutineScope(SupervisorJob())
+
+    val store = DataStoreKeyValueStore(appContext)
+    private val tokens = com.barati.razi.core.data.EncryptedTokenStorage(appContext)
+
+    /** فقط در debug: آدرس سروری که کاربر در صفحه ورود وارد کرده است. */
+    @Volatile
+    var serverOrigin: String? = null
+        private set
+
+    private lateinit var authRef: DefaultAuthRepository
+
+    val api = HttpFactory.create(
+        baseUrl = BuildConfig.API_BASE_URL,
+        tokens = tokens,
+        originOverride = { if (BuildConfig.ALLOW_SERVER_OVERRIDE) serverOrigin else null },
+        debug = BuildConfig.DEBUG,
+        onSessionExpired = { authRef.onSessionExpired() },
+    )
+
+    val authRepository = DefaultAuthRepository(api, tokens, store, "${Build.MANUFACTURER} ${Build.MODEL}").also { authRef = it }
+    val contentRepository = ContentRepository(api)
+    val incidentRepository = IncidentRepository(
+        api = api,
+        store = store,
+        bundledForm = { appContext.assets.open("forms/incident_form.json").bufferedReader().use { it.readText() } },
+    )
+
+    suspend fun loadServerOrigin() {
+        serverOrigin = store.get(Keys.SERVER_ORIGIN)
+    }
+
+    fun setServerOrigin(origin: String?) {
+        val cleaned = origin?.trim()?.trimEnd('/')?.takeIf { it.isNotEmpty() }
+        serverOrigin = cleaned
+        scope.launch { store.put(Keys.SERVER_ORIGIN, cleaned) }
+    }
+}
