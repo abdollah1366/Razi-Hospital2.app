@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from cryptography.fernet import Fernet
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _DEV_JWT_SECRET = "dev-only-change-me-dev-only-change-me"
@@ -22,14 +23,25 @@ class Settings(BaseSettings):
     lockout_minutes: int = 15
     bootstrap_admin_code: str | None = None
     bootstrap_admin_password: str | None = None
+    # فقط برای env=staging: رمز کاربران نمایشی (به جای رمز پیش‌فرض عمومی)
+    demo_password: str | None = None
+
+    @property
+    def is_exposed(self) -> bool:
+        """سرورهایی که از اینترنت در دسترس‌اند: staging (آزمایشی) و production (عملیاتی)."""
+        return self.env in ("staging", "production")
 
     def check_production(self) -> None:
-        if self.env != "production":
+        if not self.is_exposed:
             return
         if self.jwt_secret == _DEV_JWT_SECRET or len(self.jwt_secret) < 32:
-            raise RuntimeError("RAZI_JWT_SECRET باید در محیط عملیاتی تنظیم شود (حداقل ۳۲ نویسه)")
+            raise RuntimeError("RAZI_JWT_SECRET باید تنظیم شود (حداقل ۳۲ نویسه)")
         if self.data_encryption_key == _DEV_DATA_KEY:
-            raise RuntimeError("RAZI_DATA_ENCRYPTION_KEY باید در محیط عملیاتی تنظیم شود")
+            raise RuntimeError("RAZI_DATA_ENCRYPTION_KEY باید تنظیم شود")
+        try:
+            Fernet(self.data_encryption_key.encode())
+        except ValueError:
+            raise RuntimeError("RAZI_DATA_ENCRYPTION_KEY کلید Fernet معتبر نیست") from None
 
 
 @lru_cache

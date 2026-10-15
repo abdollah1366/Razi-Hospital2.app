@@ -15,7 +15,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="سامانه جامع بیمارستان رازی تبریز",
         version="0.1.0",
-        docs_url=None if settings.env == "production" else "/docs",
+        docs_url=None if settings.is_exposed else "/docs",
         redoc_url=None,
     )
     if settings.cors_origins:

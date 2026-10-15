@@ -56,6 +56,30 @@ python -m app.seed --demo
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+## سرور آزمایشی روی اینترنت (برای گوشی)
+
+برای وقتی که گوشی با اینترنت موبایل یا از بیرون به سرور وصل می‌شود. **فقط داده ساختگی** وارد کنید؛ ارتباط HTTP است و رمزنگاری نمی‌شود.
+
+۱. ساخت رمزهای تصادفی (در PowerShell، داخل پوشه پروژه):
+
+```powershell
+docker run --rm python:3.12-slim python -c "import secrets,base64,os;print('POSTGRES_PASSWORD='+secrets.token_hex(16));print('RAZI_JWT_SECRET='+secrets.token_hex(32));print('RAZI_DATA_ENCRYPTION_KEY='+base64.urlsafe_b64encode(os.urandom(32)).decode());print('RAZI_DEMO_PASSWORD=Rz'+secrets.token_hex(5))" | Out-File -Encoding ascii .env.public
+```
+
+فایل `.env.public` در git ثبت نمی‌شود (نمونه: `.env.public.example`). رمز ورود کاربران 1001 تا 1005 همان `RAZI_DEMO_PASSWORD` داخل این فایل است.
+
+۲. اجرا:
+
+```powershell
+docker compose -f docker-compose.public.yml --env-file .env.public up -d --build
+```
+
+در این حالت (`RAZI_ENV=staging`): سرور بدون رمزهای واقعی بالا نمی‌آید، صفحه `/docs` بسته است، پورت پایگاه داده بیرون داده نمی‌شود و رمز `Razi1234` کار نمی‌کند. بررسی سلامت: `http://IP:8000/health`.
+
+۳. در مودم، پورت 8000 را به IP داخلی سرور forward کنید و در فایروال ویندوز پورت 8000 (TCP) را باز کنید.
+
+۴. در اپ (نسخه debug) در صفحه ورود «تغییر آدرس سرور» را بزنید و `http://IP-عمومی:8000` را وارد کنید.
+
 ## تست‌ها
 
 ```bash
@@ -77,6 +101,6 @@ docs/       طرح اجرایی
 
 ## نکات امنیتی پیش از استقرار واقعی
 
-- `RAZI_JWT_SECRET` و `RAZI_DATA_ENCRYPTION_KEY` را تنظیم کنید؛ با `RAZI_ENV=production` سرور بدون آن‌ها اجرا نمی‌شود.
+- `RAZI_JWT_SECRET` و `RAZI_DATA_ENCRYPTION_KEY` را تنظیم کنید؛ با `RAZI_ENV=production` یا `staging` سرور بدون آن‌ها اجرا نمی‌شود.
 - سرور را پشت Nginx با گواهی TLS قرار دهید و آدرس آن را هنگام build با `-Prazi.apiBaseUrl=https://.../api/v1/` بدهید.
 - داده نمایشی (`--demo`) را در محیط عملیاتی اجرا نکنید.

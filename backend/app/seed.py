@@ -2,7 +2,7 @@
 
 اجرا:
     python -m app.seed            # نقش‌ها و فرم؛ مدیر اولیه از RAZI_BOOTSTRAP_ADMIN_CODE/PASSWORD
-    python -m app.seed --demo     # به‌علاوه واحدها و کاربران نمایشی (فقط محیط توسعه)
+    python -m app.seed --demo     # به‌علاوه واحدها و کاربران نمایشی (توسعه، یا staging با RAZI_DEMO_PASSWORD)
 """
 
 import json
@@ -73,8 +73,15 @@ def seed_bootstrap_admin(db: Session) -> None:
 
 
 def seed_demo(db: Session) -> None:
-    if get_settings().env == "production":
+    s = get_settings()
+    if s.env == "production":
         raise RuntimeError("داده نمایشی در محیط عملیاتی مجاز نیست")
+    password = DEMO_PASSWORD
+    if s.env == "staging":
+        # سرور آزمایشی روی اینترنت نباید رمز عمومیِ README را داشته باشد.
+        if not s.demo_password or len(s.demo_password) < 10 or s.demo_password == DEMO_PASSWORD:
+            raise RuntimeError("در staging باید RAZI_DEMO_PASSWORD (حداقل ۱۰ نویسه) تنظیم شود")
+        password = s.demo_password
     if db.scalar(select(Unit)) is not None:
         return
     units = {
@@ -100,25 +107,25 @@ def seed_demo(db: Session) -> None:
     }
     db.add_all(units.values())
     db.flush()
-    _user(db, "1001", "کارمند نمونه (پرستار اورژانس)", units["emergency"], [("staff", None)], DEMO_PASSWORD)
+    _user(db, "1001", "کارمند نمونه (پرستار اورژانس)", units["emergency"], [("staff", None)], password)
     _user(
         db,
         "1002",
         "سرپرستار اورژانس",
         units["emergency"],
         [("unit_manager", units["emergency"])],
-        DEMO_PASSWORD,
+        password,
     )
-    _user(db, "1003", "کارشناس ایمنی بیمار", units["quality"], [("patient_safety", None)], DEMO_PASSWORD)
+    _user(db, "1003", "کارشناس ایمنی بیمار", units["quality"], [("patient_safety", None)], password)
     _user(
         db,
         "1004",
         "مدیر محتوا",
         units["quality"],
         [("content_manager", None), ("staff", None)],
-        DEMO_PASSWORD,
+        password,
     )
-    _user(db, "1005", "مدیر سیستم", units["it"], [("sysadmin", None), ("auditor", None)], DEMO_PASSWORD)
+    _user(db, "1005", "مدیر سیستم", units["it"], [("sysadmin", None), ("auditor", None)], password)
     db.add_all(
         [
             Faq(
