@@ -47,6 +47,7 @@ class MeOut(BaseModel):
     full_name: str
     unit_id: uuid.UUID | None
     unit_name: str | None
+    job_title: str | None = None
     roles: list[str]
     permissions: list[str]
     must_change_password: bool
@@ -88,6 +89,7 @@ class UserCreateIn(BaseModel):
     full_name: str = Field(min_length=1, max_length=200)
     mobile: str | None = None
     unit_id: uuid.UUID | None = None
+    job_title: str | None = Field(default=None, max_length=100)
     temporary_password: str = Field(min_length=8, max_length=200)
     roles: list[RoleAssignment] = []
 
@@ -96,6 +98,7 @@ class UserUpdateIn(BaseModel):
     full_name: str | None = None
     mobile: str | None = None
     unit_id: uuid.UUID | None = None
+    job_title: str | None = Field(default=None, max_length=100)
     is_active: bool | None = None
     roles: list[RoleAssignment] | None = None
 
@@ -110,6 +113,7 @@ class UserOut(BaseModel):
     full_name: str
     mobile: str | None
     unit_id: uuid.UUID | None
+    job_title: str | None = None
     is_active: bool
     must_change_password: bool
     roles: list[RoleAssignment]

@@ -43,6 +43,7 @@ docker compose up --build
 | 1003 | کارشناس ایمنی بیمار | `Razi1234` |
 | 1004 | مدیر محتوا | `Razi1234` |
 | 1005 | مدیر سیستم و حسابرس | `Razi1234` |
+| 1006 | مسئول آموزش | `Razi1234` |
 
 بدون Docker (نیاز به Python 3.11+ و PostgreSQL):
 
@@ -68,7 +69,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 docker run --rm python:3.12-slim python -c "import secrets,base64,os;print('POSTGRES_PASSWORD='+secrets.token_hex(16));print('RAZI_JWT_SECRET='+secrets.token_hex(32));print('RAZI_DATA_ENCRYPTION_KEY='+base64.urlsafe_b64encode(os.urandom(32)).decode());print('RAZI_DEMO_PASSWORD=Rz'+secrets.token_hex(5))" | Out-File -Encoding ascii .env.public
 ```
 
-فایل `.env.public` در git ثبت نمی‌شود (نمونه: `.env.public.example`). رمز ورود کاربران 1001 تا 1005 همان `RAZI_DEMO_PASSWORD` داخل این فایل است.
+فایل `.env.public` در git ثبت نمی‌شود (نمونه: `.env.public.example`). رمز ورود کاربران 1001 تا 1006 همان `RAZI_DEMO_PASSWORD` داخل این فایل است.
 
 ۲. اجرا:
 

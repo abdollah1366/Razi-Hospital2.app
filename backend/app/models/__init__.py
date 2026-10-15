@@ -2,9 +2,11 @@ import uuid
 from datetime import UTC, date, datetime
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -55,6 +57,7 @@ class User(TimestampMixin, Base):
     full_name: Mapped[str] = mapped_column(String(200))
     mobile: Mapped[str | None] = mapped_column(String(20))
     unit_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("units.id"))
+    job_title: Mapped[str | None] = mapped_column(String(100), index=True)  # سمت؛ مثلاً پرستار
     password_hash: Mapped[str] = mapped_column(String(300))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -236,3 +239,136 @@ class Feedback(TimestampMixin, Base):
     body: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(20), default="received")  # received | reviewing | answered
     response: Mapped[str | None] = mapped_column(Text)
+
+
+# ---------------------------------------------------------------- آموزش
+
+
+class AudienceMixin:
+    """مخاطب: افراد نام‌برده همیشه؛ بقیه باید در همه فهرست‌های پرشده بگنجند. همه خالی = همه کارکنان."""
+
+    target_unit_ids: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    target_role_codes: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    target_job_titles: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    target_user_ids: Mapped[list[str]] = mapped_column(JSONB, default=list)
+
+
+class MediaFile(Base):
+    """فایل بارگذاری‌شده؛ خود فایل روی دیسک (media_dir) و فقط از راه API با بررسی دسترسی."""
+
+    __tablename__ = "media_files"
+    id: Mapped[uuid.UUID] = pk()
+    original_name: Mapped[str] = mapped_column(String(300))
+    content_type: Mapped[str] = mapped_column(String(100))
+    size: Mapped[int] = mapped_column(BigInteger)
+    sha256: Mapped[str] = mapped_column(String(64))
+    storage_name: Mapped[str] = mapped_column(String(100), unique=True)
+    uploaded_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Course(AudienceMixin, TimestampMixin, Base):
+    __tablename__ = "courses"
+    id: Mapped[uuid.UUID] = pk()
+    title: Mapped[str] = mapped_column(String(300))
+    description: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(
+        String(20), default="draft", index=True
+    )  # draft | published | archived
+    is_mandatory: Mapped[bool] = mapped_column(Boolean, default=False)
+    due_date: Mapped[date | None] = mapped_column(Date)
+    cover_media_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("media_files.id"))
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+
+    items: Mapped[list["CourseItem"]] = relationship(
+        order_by="CourseItem.sort_order", cascade="all, delete-orphan", back_populates="course"
+    )
+
+
+class CourseItem(Base):
+    """یک محتوای دوره: متن، عکس، فیلم، صوت، PDF، پاورپوینت، فایل یا لینک."""
+
+    __tablename__ = "course_items"
+    id: Mapped[uuid.UUID] = pk()
+    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), index=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    kind: Mapped[str] = mapped_column(String(20))
+    title: Mapped[str] = mapped_column(String(300))
+    body: Mapped[str | None] = mapped_column(Text)  # متن، یا نشانی لینک
+    media_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("media_files.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    course: Mapped[Course] = relationship(back_populates="items")
+    media: Mapped[MediaFile | None] = relationship(lazy="joined")
+
+
+class ContentView(Base):
+    """هر بار باز کردن یک محتوا یک ردیف است؛ مدت و درصد تماشا را اپ به‌روز می‌کند."""
+
+    __tablename__ = "content_views"
+    id: Mapped[uuid.UUID] = pk()
+    item_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("course_items.id", ondelete="CASCADE"), index=True)
+    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    seconds: Mapped[int] = mapped_column(Integer, default=0)
+    progress: Mapped[int] = mapped_column(Integer, default=0)  # درصد، برای فیلم و صوت
+    completed: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class Exam(AudienceMixin, TimestampMixin, Base):
+    __tablename__ = "exams"
+    id: Mapped[uuid.UUID] = pk()
+    course_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("courses.id", ondelete="SET NULL"), index=True
+    )
+    title: Mapped[str] = mapped_column(String(300))
+    description: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="draft")  # draft | published
+    # auto: طبق opens_at/closes_at؛ open/closed: باز یا بسته به دست مسئول آموزش
+    manual_state: Mapped[str] = mapped_column(String(10), default="auto")
+    opens_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    closes_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    time_limit_minutes: Mapped[int | None] = mapped_column(Integer)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=1)
+    pass_score: Mapped[int] = mapped_column(Integer, default=60)  # درصد
+    shuffle_questions: Mapped[bool] = mapped_column(Boolean, default=True)
+    shuffle_options: Mapped[bool] = mapped_column(Boolean, default=True)
+    show_answers: Mapped[str] = mapped_column(
+        String(20), default="after_close"
+    )  # never|after_submit|after_close
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+
+    questions: Mapped[list["ExamQuestion"]] = relationship(
+        order_by="ExamQuestion.sort_order", cascade="all, delete-orphan"
+    )
+
+
+class ExamQuestion(Base):
+    __tablename__ = "exam_questions"
+    id: Mapped[uuid.UUID] = pk()
+    exam_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("exams.id", ondelete="CASCADE"), index=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    kind: Mapped[str] = mapped_column(String(20))  # single | multiple | true_false
+    text: Mapped[str] = mapped_column(Text)
+    # [{"id": "a", "text": "...", "correct": true}]
+    options: Mapped[list[dict]] = mapped_column(JSONB, default=list)
+    points: Mapped[int] = mapped_column(Integer, default=1)
+    explanation: Mapped[str | None] = mapped_column(Text)
+
+
+class ExamAttempt(Base):
+    __tablename__ = "exam_attempts"
+    id: Mapped[uuid.UUID] = pk()
+    exam_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("exams.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # ترتیب سؤال‌ها و گزینه‌ها برای همین شرکت‌کننده: [{"q": id, "o": [option ids]}]
+    layout: Mapped[list[dict]] = mapped_column(JSONB, default=list)
+    answers: Mapped[dict] = mapped_column(JSONB, default=dict)  # {question_id: [option ids]}
+    points: Mapped[float | None] = mapped_column(Float)
+    max_points: Mapped[float | None] = mapped_column(Float)
+    score: Mapped[float | None] = mapped_column(Float)  # درصد
+    passed: Mapped[bool | None] = mapped_column(Boolean)

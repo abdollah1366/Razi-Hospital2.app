@@ -83,6 +83,8 @@ def seed_demo(db: Session) -> None:
             raise RuntimeError("در staging باید RAZI_DEMO_PASSWORD (حداقل ۱۰ نویسه) تنظیم شود")
         password = s.demo_password
     if db.scalar(select(Unit)) is not None:
+        # پایگاه داده قبلاً داده نمایشی دارد؛ فقط موارد تازه (مثل بخش آموزش) افزوده می‌شوند.
+        seed_demo_training(db, password)
         return
     units = {
         "emergency": Unit(
@@ -126,6 +128,8 @@ def seed_demo(db: Session) -> None:
         password,
     )
     _user(db, "1005", "مدیر سیستم", units["it"], [("sysadmin", None), ("auditor", None)], password)
+    db.flush()
+    seed_demo_training(db, password)
     db.add_all(
         [
             Faq(
@@ -154,6 +158,30 @@ def seed_demo(db: Session) -> None:
             ),
         ]
     )
+
+
+DEMO_JOB_TITLES = {
+    "1001": "پرستار",
+    "1002": "سرپرستار",
+    "1003": "کارشناس ایمنی بیمار",
+    "1004": "کارشناس روابط عمومی",
+    "1006": "کارشناس آموزش",
+}
+
+
+def seed_demo_training(db: Session, password: str) -> None:
+    """مسئول آموزش نمایشی (1006) و سمت کاربران نمایشی؛ اجرای دوباره چیزی را تکرار نمی‌کند."""
+    name = "واحد آموزش"
+    unit = db.scalar(select(Unit).where(Unit.name == name))
+    if unit is None:
+        unit = Unit(name=name, type="admin")
+        db.add(unit)
+        db.flush()
+    _user(db, "1006", "مسئول آموزش", unit, [("training_manager", None), ("staff", None)], password)
+    db.flush()
+    for u in db.scalars(select(User).where(User.personnel_code.in_(DEMO_JOB_TITLES))):
+        if not u.job_title:
+            u.job_title = DEMO_JOB_TITLES[u.personnel_code]
 
 
 def run(demo: bool = False) -> None:

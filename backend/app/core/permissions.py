@@ -19,11 +19,16 @@ PERMISSIONS: dict[str, str] = {
     "user.manage": "مدیریت کاربران و نقش‌ها",
     "unit.manage": "مدیریت واحدها",
     "form.manage": "مدیریت قالب فرم‌ها",
+    "training.read": "شرکت در دوره‌ها و آزمون‌های آموزشی",
+    "training.manage": "مدیریت دوره، محتوا و آزمون و دیدن نتایج و آمار آموزش",
 }
 
 DEFAULT_ROLES: dict[str, tuple[str, list[str]]] = {
-    "staff": ("کارمند", ["incident.create", "announcement.read"]),
-    "unit_manager": ("مسئول واحد", ["incident.create", "incident.read", "announcement.read"]),
+    "staff": ("کارمند", ["incident.create", "announcement.read", "training.read"]),
+    "unit_manager": (
+        "مسئول واحد",
+        ["incident.create", "incident.read", "announcement.read", "training.read"],
+    ),
     "patient_safety": (
         "کارشناس ایمنی بیمار",
         [
@@ -34,13 +39,15 @@ DEFAULT_ROLES: dict[str, tuple[str, list[str]]] = {
             "incident.sensitive.view",
             "announcement.read",
             "dashboard.read",
+            "training.read",
         ],
     ),
     "content_manager": (
         "مدیر محتوا",
-        ["announcement.read", "announcement.manage", "faq.manage", "feedback.manage"],
+        ["announcement.read", "announcement.manage", "faq.manage", "feedback.manage", "training.read"],
     ),
-    "executive": ("مدیر ارشد", ["announcement.read", "dashboard.read"]),
+    "training_manager": ("مسئول آموزش", ["announcement.read", "training.read", "training.manage"]),
+    "executive": ("مدیر ارشد", ["announcement.read", "dashboard.read", "training.read"]),
     "auditor": ("حسابرس", ["audit.read"]),
     # مدیر سیستم عمداً به محتوای گزارش‌های خطا دسترسی ندارد.
     "sysadmin": ("مدیر سیستم", ["user.manage", "unit.manage", "form.manage", "announcement.read"]),

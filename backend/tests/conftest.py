@@ -2,6 +2,7 @@ import os
 
 os.environ.setdefault("RAZI_DATABASE_URL", "postgresql+psycopg://razi:razi@localhost:5432/razi_test")
 os.environ["RAZI_ENV"] = "test"
+os.environ["RAZI_MEDIA_DIR"] = __import__("tempfile").mkdtemp(prefix="razi-media-")
 
 from pathlib import Path  # noqa: E402
 
@@ -59,4 +60,4 @@ def auth(client, code: str) -> dict:
     return {"Authorization": f"Bearer {login(client, code)['access_token']}"}
 
 
-STAFF, UNIT_MANAGER, SAFETY, CONTENT, SYSADMIN = "1001", "1002", "1003", "1004", "1005"
+STAFF, UNIT_MANAGER, SAFETY, CONTENT, SYSADMIN, TRAINER = "1001", "1002", "1003", "1004", "1005", "1006"
