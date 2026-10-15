@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,12 +44,14 @@ fun StaffHomeScreen(
     onAnnouncements: () -> Unit,
     onReview: () -> Unit,
     onTraining: () -> Unit,
+    onRequests: () -> Unit,
     onPublic: () -> Unit,
     onLogout: () -> Unit,
 ) {
     var pendingAck by remember { mutableIntStateOf(0) }
     var pendingTraining by remember { mutableIntStateOf(0) }
     val pending by container.incidentRepository.pending.collectAsState(initial = emptyList())
+    val pendingRequests by container.serviceRequestRepository.pending.collectAsState(initial = emptyList())
     LaunchedEffect(me.id) {
         if (me.can("announcement.read")) pendingAck = container.contentRepository.pendingAckCount()
         if (me.can("training.read")) pendingTraining = container.trainingRepository.pendingCount()
@@ -97,9 +100,21 @@ fun StaffHomeScreen(
                     badge = pendingTraining,
                 )
             }
+            if (me.can("request.create") || me.can("request.handle") || me.can("request.read")) {
+                MenuTile(
+                    "درخواست پشتیبانی",
+                    when {
+                        pendingRequests.isNotEmpty() -> toPersianDigits("${pendingRequests.size} درخواست در انتظار ارسال")
+                        me.can("request.handle") -> "کارتابل درخواست‌های واحد شما"
+                        else -> "فناوری اطلاعات، تجهیزات پزشکی و تأسیسات"
+                    },
+                    Icons.Filled.SupportAgent,
+                    onRequests,
+                )
+            }
             MenuTile("خدمات عمومی بیمارستان", "راهنمای بخش‌ها، پرسش‌ها و شکایات", Icons.Filled.Public, onPublic)
             Text(
-                "بخش‌های پژوهش، گفتگو و درخواست‌های پشتیبانی در مراحل بعدی اضافه می‌شوند.",
+                "بخش‌های پژوهش و گفتگو در مراحل بعدی اضافه می‌شوند.",
                 style = MaterialTheme.typography.bodySmall,
             )
         }

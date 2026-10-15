@@ -7,6 +7,7 @@ import com.barati.razi.core.data.DataStoreKeyValueStore
 import com.barati.razi.core.data.DefaultAuthRepository
 import com.barati.razi.core.data.IncidentRepository
 import com.barati.razi.core.data.Keys
+import com.barati.razi.core.data.ServiceRequestRepository
 import com.barati.razi.core.data.TrainingRepository
 import com.barati.razi.core.network.HttpFactory
 import kotlinx.coroutines.CoroutineScope
@@ -46,6 +47,8 @@ class AppContainer(context: Context) {
         store = store,
         bundledForm = { appContext.assets.open("forms/incident_form.json").bufferedReader().use { it.readText() } },
     )
+
+    val serviceRequestRepository = ServiceRequestRepository(api, store)
 
     /** ریشه سرور برای پیوند فایل‌های آموزشی (پیوندها نسبی‌اند: /api/v1/training/media/...). */
     private val defaultOrigin: String = BuildConfig.API_BASE_URL.toHttpUrl().let { "${it.scheme}://${it.host}:${it.port}" }

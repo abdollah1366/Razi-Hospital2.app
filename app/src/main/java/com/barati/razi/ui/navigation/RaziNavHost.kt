@@ -28,6 +28,9 @@ import com.barati.razi.feature.publicinfo.FeedbackScreen
 import com.barati.razi.feature.publicinfo.PublicHomeScreen
 import com.barati.razi.feature.publicinfo.PublicNewsScreen
 import com.barati.razi.feature.publicinfo.UnitsScreen
+import com.barati.razi.feature.requests.NewRequestScreen
+import com.barati.razi.feature.requests.RequestDetailScreen
+import com.barati.razi.feature.requests.RequestsHomeScreen
 import com.barati.razi.feature.training.AttemptScreen
 import com.barati.razi.feature.training.CourseItemScreen
 import com.barati.razi.feature.training.CourseScreen
@@ -57,11 +60,14 @@ object Routes {
     const val COURSE_ITEM = "course/{courseId}/item/{itemId}"
     const val EXAM_TAKE = "exam/{id}/take"
     const val ATTEMPT = "attempt/{id}"
+    const val REQUESTS = "requests"
+    const val REQUEST_NEW = "request_new"
+    const val REQUEST_DETAIL = "request/{id}"
 
     /** صفحه‌هایی که بدون نشست معتبر باز نمی‌مانند. */
     val staffOnly = setOf(
         CHANGE_PASSWORD, STAFF_HOME, MY_INCIDENTS, INCIDENT_DETAIL, ANNOUNCEMENTS, REVIEW,
-        TRAINING, COURSE, COURSE_ITEM, EXAM_TAKE, ATTEMPT,
+        TRAINING, COURSE, COURSE_ITEM, EXAM_TAKE, ATTEMPT, REQUESTS, REQUEST_DETAIL,
     )
 
     fun track(code: String = "", secret: String = "") = "track?code=${Uri.encode(code)}&secret=${Uri.encode(secret)}"
@@ -70,6 +76,7 @@ object Routes {
     fun courseItem(courseId: String, itemId: String) = "course/$courseId/item/$itemId"
     fun examTake(id: String) = "exam/$id/take"
     fun attempt(id: String) = "attempt/$id"
+    fun request(id: String) = "request/$id"
 }
 
 @Composable
@@ -151,6 +158,7 @@ fun RaziNavHost(container: AppContainer, nav: NavHostController = rememberNavCon
                     onAnnouncements = { nav.navigate(Routes.ANNOUNCEMENTS) },
                     onReview = { nav.navigate(Routes.REVIEW) },
                     onTraining = { nav.navigate(Routes.TRAINING) },
+                    onRequests = { nav.navigate(Routes.REQUESTS) },
                     onPublic = { nav.popBackStack(Routes.PUBLIC_HOME, inclusive = false) },
                     onLogout = { scope.launch { container.authRepository.logout() } },
                 )
@@ -214,6 +222,31 @@ fun RaziNavHost(container: AppContainer, nav: NavHostController = rememberNavCon
         }
         composable(Routes.EXAM_TAKE, arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
             ExamTakeScreen(container, entry.arguments?.getString("id").orEmpty(), back)
+        }
+        composable(Routes.REQUESTS) {
+            val s = session
+            if (s is SessionState.LoggedIn) {
+                RequestsHomeScreen(
+                    container,
+                    s.me,
+                    onBack = back,
+                    onNew = { nav.navigate(Routes.REQUEST_NEW) },
+                    onOpen = { nav.navigate(Routes.request(it)) },
+                )
+            } else {
+                LoadingBox()
+            }
+        }
+        // مثل فرم گزارش، در staffOnly نیست تا با منقضی‌شدن نشست، متن واردشده از دست نرود.
+        composable(Routes.REQUEST_NEW) {
+            NewRequestScreen(
+                container,
+                onBack = back,
+                onCreated = { nav.navigate(Routes.request(it)) { popUpTo(Routes.REQUEST_NEW) { inclusive = true } } },
+            )
+        }
+        composable(Routes.REQUEST_DETAIL, arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
+            RequestDetailScreen(container, entry.arguments?.getString("id").orEmpty(), back)
         }
         composable(Routes.ATTEMPT, arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
             AttemptScreen(container, entry.arguments?.getString("id").orEmpty(), back)

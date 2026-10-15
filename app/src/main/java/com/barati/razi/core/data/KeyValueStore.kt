@@ -14,4 +14,5 @@ object Keys {
     const val INCIDENT_FORM = "form_incident"
     const val PENDING_INCIDENTS = "pending_incidents"
     const val LOCAL_ANONYMOUS = "local_anonymous_reports"
+    const val PENDING_REQUESTS = "pending_service_requests"
 }
