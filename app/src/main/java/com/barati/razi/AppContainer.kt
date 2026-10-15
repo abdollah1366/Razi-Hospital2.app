@@ -7,10 +7,14 @@ import com.barati.razi.core.data.DataStoreKeyValueStore
 import com.barati.razi.core.data.DefaultAuthRepository
 import com.barati.razi.core.data.IncidentRepository
 import com.barati.razi.core.data.Keys
+import com.barati.razi.core.data.TrainingRepository
 import com.barati.razi.core.network.HttpFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 
 /** وابستگی‌های اپ؛ تزریق دستی برای سادگی (بدون Hilt). */
 class AppContainer(context: Context) {
@@ -41,6 +45,20 @@ class AppContainer(context: Context) {
         api = api,
         store = store,
         bundledForm = { appContext.assets.open("forms/incident_form.json").bufferedReader().use { it.readText() } },
+    )
+
+    /** ریشه سرور برای پیوند فایل‌های آموزشی (پیوندها نسبی‌اند: /api/v1/training/media/...). */
+    private val defaultOrigin: String = BuildConfig.API_BASE_URL.toHttpUrl().let { "${it.scheme}://${it.host}:${it.port}" }
+
+    val trainingRepository = TrainingRepository(
+        api = api,
+        http = OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .build(),
+        cacheDir = appContext.cacheDir,
+        origin = { (if (BuildConfig.ALLOW_SERVER_OVERRIDE) serverOrigin else null) ?: defaultOrigin },
+        scope = scope,
     )
 
     suspend fun loadServerOrigin() {

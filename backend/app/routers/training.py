@@ -220,11 +220,13 @@ def _my_exam_fields(db: Session, e: Exam, user_id: uuid.UUID, now: datetime) -> 
     done = [a for a in attempts if a.submitted_at is not None]
     open_attempt = next((a for a in attempts if a.submitted_at is None), None)
     best = max((a.score for a in done if a.score is not None), default=None)
+    last = max(done, key=lambda a: a.submitted_at, default=None)
     return {
         "attempts_used": len(attempts),
         "best_score": best,
         "passed": any(a.passed for a in done) if done else None,
         "in_progress_attempt_id": open_attempt.id if open_attempt else None,
+        "last_attempt_id": last.id if last else None,
     }
 
 

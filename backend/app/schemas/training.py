@@ -228,6 +228,8 @@ class ExamOut(Audience):
     best_score: float | None = None
     passed: bool | None = None
     in_progress_attempt_id: uuid.UUID | None = None
+    # برای دیدن دوباره نتیجه (و پاسخ‌ها پس از بسته شدن آزمون)
+    last_attempt_id: uuid.UUID | None = None
     # فقط در نمای مسئول آموزش
     audience_size: int | None = None
     attempt_count: int | None = None

@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.ReportProblem
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,13 +42,16 @@ fun StaffHomeScreen(
     onMyIncidents: () -> Unit,
     onAnnouncements: () -> Unit,
     onReview: () -> Unit,
+    onTraining: () -> Unit,
     onPublic: () -> Unit,
     onLogout: () -> Unit,
 ) {
     var pendingAck by remember { mutableIntStateOf(0) }
+    var pendingTraining by remember { mutableIntStateOf(0) }
     val pending by container.incidentRepository.pending.collectAsState(initial = emptyList())
     LaunchedEffect(me.id) {
         if (me.can("announcement.read")) pendingAck = container.contentRepository.pendingAckCount()
+        if (me.can("training.read")) pendingTraining = container.trainingRepository.pendingCount()
     }
     RaziScaffold(
         title = "بخش کارکنان",
@@ -60,7 +64,9 @@ fun StaffHomeScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(me.fullName, style = MaterialTheme.typography.titleLarge)
-            me.unitName?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+            listOfNotNull(me.unitName, me.jobTitle).takeIf { it.isNotEmpty() }?.let {
+                Text(it.joinToString(" · "), style = MaterialTheme.typography.bodyMedium)
+            }
             if (me.can("incident.create")) {
                 MenuTile("ثبت گزارش خطا، حادثه یا شبه‌خطا", "امکان ارسال ناشناس", Icons.Filled.ReportProblem, onNewIncident)
                 MenuTile(
@@ -82,9 +88,18 @@ fun StaffHomeScreen(
                     badge = pendingAck,
                 )
             }
+            if (me.can("training.read")) {
+                MenuTile(
+                    "آموزش",
+                    if (pendingTraining > 0) "دوره‌ها و آزمون‌هایی که در انتظار شماست" else "دوره‌ها، فیلم‌ها و آزمون‌های آموزشی",
+                    Icons.Filled.School,
+                    onTraining,
+                    badge = pendingTraining,
+                )
+            }
             MenuTile("خدمات عمومی بیمارستان", "راهنمای بخش‌ها، پرسش‌ها و شکایات", Icons.Filled.Public, onPublic)
             Text(
-                "بخش‌های آموزش، پژوهش، گفتگو و درخواست‌های پشتیبانی در مراحل بعدی اضافه می‌شوند.",
+                "بخش‌های پژوهش، گفتگو و درخواست‌های پشتیبانی در مراحل بعدی اضافه می‌شوند.",
                 style = MaterialTheme.typography.bodySmall,
             )
         }

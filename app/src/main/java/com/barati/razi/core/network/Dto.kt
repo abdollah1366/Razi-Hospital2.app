@@ -35,6 +35,7 @@ data class MeDto(
     @SerialName("full_name") val fullName: String,
     @SerialName("unit_id") val unitId: String? = null,
     @SerialName("unit_name") val unitName: String? = null,
+    @SerialName("job_title") val jobTitle: String? = null,
     val roles: List<String>,
     val permissions: List<String>,
     @SerialName("must_change_password") val mustChangePassword: Boolean,
