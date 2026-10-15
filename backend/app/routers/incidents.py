@@ -29,6 +29,7 @@ from app.schemas import (
     TrackOut,
 )
 from app.services.forms import validate_answers
+from app.services.notifications import notify
 
 router = APIRouter(tags=["incidents"])
 
@@ -40,6 +41,16 @@ TRANSITIONS: dict[str, set[str]] = {
     "action_taken": {"closed", "in_progress"},
     "closed": set(),
     "rejected": {"under_review"},
+}
+
+STATUS_LABELS = {
+    "submitted": "ثبت‌شده",
+    "under_review": "در حال بررسی",
+    "assigned": "ارجاع‌شده",
+    "in_progress": "در حال اقدام",
+    "action_taken": "اقدام اصلاحی انجام شد",
+    "closed": "بسته‌شده",
+    "rejected": "رد شده",
 }
 
 
@@ -280,12 +291,23 @@ def _require_manage(cu: CurrentUser, i: Incident) -> None:
         raise api_error(status.HTTP_403_FORBIDDEN, "forbidden", "اجازه مدیریت این گزارش را ندارید")
 
 
-def _change_status(i: Incident, to: str, by: uuid.UUID, note: str | None) -> None:
+def _change_status(db: Session, i: Incident, to: str, by: uuid.UUID, note: str | None) -> None:
     if to not in TRANSITIONS.get(i.status, set()):
         raise api_error(409, "invalid_transition", f"تغییر وضعیت از «{i.status}» به «{to}» مجاز نیست")
     i.history.append(IncidentStatusChange(from_status=i.status, to_status=to, by_user_id=by, note=note))
     i.status = to
     i.closed_at = datetime.now(UTC) if to in ("closed", "rejected") else None
+    # فقط کد پیگیری و وضعیت؛ یادداشت بررسی ممکن است اطلاعات بیمار داشته باشد. گزارش ناشناس گیرنده‌ای ندارد.
+    if not i.is_anonymous:
+        notify(
+            db,
+            [i.reporter_id],
+            "incident.status",
+            f"گزارش {i.tracking_code}: {STATUS_LABELS[to]}",
+            link_type="incident",
+            link_id=i.id,
+            actor_id=by,
+        )
 
 
 @router.post("/incidents/{incident_id}/status", response_model=IncidentSummaryOut)
@@ -299,7 +321,7 @@ def change_status(
     i = _load(db, incident_id)
     _require_manage(cu, i)
     old = i.status
-    _change_status(i, body.status, cu.id, body.note)
+    _change_status(db, i, body.status, cu.id, body.note)
     audit(db, "incident.status", cu.id, "incident", i.id, client_ip(request), old=old, new=body.status)
     db.commit()
     return _summary(i, _unit_names(db, {i.unit_id}))
@@ -321,10 +343,21 @@ def assign(
         raise api_error(400, "unknown_unit", "واحد نامعتبر است")
     if body.user_id and db.get(User, body.user_id) is None:
         raise api_error(400, "unknown_user", "کاربر نامعتبر است")
+    previous_user = i.assigned_user_id
     i.assigned_unit_id = body.unit_id or i.assigned_unit_id
     i.assigned_user_id = body.user_id or i.assigned_user_id
     if i.status in ("submitted", "under_review"):
-        _change_status(i, "assigned", cu.id, body.note)
+        _change_status(db, i, "assigned", cu.id, body.note)
+    notify(
+        db,
+        [body.user_id] if body.user_id != previous_user else [],
+        "incident.assigned",
+        f"گزارش {i.tracking_code} برای پیگیری به شما ارجاع شد",
+        link_type="incident",
+        link_id=i.id,
+        important=True,
+        actor_id=cu.id,
+    )
     audit(db, "incident.assigned", cu.id, "incident", i.id, client_ip(request))
     db.commit()
     return _summary(i, _unit_names(db, {i.unit_id}))
