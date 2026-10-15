@@ -209,6 +209,9 @@ def test_exam_window_group_grading_and_answer_visibility(client):
     # آزمون دیگران را نمی‌توان دید
     assert client.get(f"{API}/training/attempts/{a['id']}", headers=t).status_code == 404
 
+    listed = client.get(f"{API}/admin/training/exams", headers=t).json()
+    assert [(x["id"], x["attempt_count"], x["state"]) for x in listed] == [(exam["id"], 1, "closed")]
+    assert client.get(f"{API}/admin/training/courses", headers=t).status_code == 200
     rep = client.get(f"{API}/admin/training/exams/{exam['id']}/report", headers=t).json()
     assert rep["participants"] == 1 and rep["passed"] == 1 and rep["average_score"] == 75.0
     assert rep["histogram"][7] == 1 and rep["not_attempted"] == []

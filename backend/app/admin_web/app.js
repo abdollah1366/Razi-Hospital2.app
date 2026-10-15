@@ -23,14 +23,17 @@ const L = {
   feedbackStatus: { received: "دریافت شد", reviewing: "در حال بررسی", answered: "پاسخ داده شد" },
 };
 
+// render(main, sub): sub بخش‌های بعدی نشانی است، مثلاً #/courses/<id>/stats → ["<id>", "stats"]
 const PAGES = [
-  { id: "dashboard", title: "داشبورد", perm: "dashboard.read", render: renderDashboard },
-  { id: "users", title: "کاربران", perm: "user.manage", render: renderUsers },
-  { id: "units", title: "واحدها", perm: "unit.manage", render: renderUnits },
-  { id: "announcements", title: "اطلاعیه‌ها", perm: "announcement.manage", render: renderAnnouncements },
-  { id: "faqs", title: "پرسش‌های متداول", perm: "faq.manage", render: renderFaqs },
-  { id: "feedback", title: "پیشنهاد و شکایت", perm: "feedback.manage", render: renderFeedback },
-  { id: "audit", title: "لاگ حسابرسی", perm: "audit.read", render: renderAudit },
+  { id: "dashboard", title: "داشبورد", icon: "dashboard", perm: "dashboard.read", render: renderDashboard },
+  { id: "courses", title: "دوره‌های آموزشی", icon: "school", perm: "training.manage", render: renderCourses },
+  { id: "exams", title: "آزمون‌ها", icon: "quiz", perm: "training.manage", render: renderExams },
+  { id: "users", title: "کاربران", icon: "people", perm: "user.manage", render: renderUsers },
+  { id: "units", title: "واحدها", icon: "units", perm: "unit.manage", render: renderUnits },
+  { id: "announcements", title: "اطلاعیه‌ها", icon: "bell", perm: "announcement.manage", render: renderAnnouncements },
+  { id: "faqs", title: "پرسش‌های متداول", icon: "help", perm: "faq.manage", render: renderFaqs },
+  { id: "feedback", title: "پیشنهاد و شکایت", icon: "chat", perm: "feedback.manage", render: renderFeedback },
+  { id: "audit", title: "لاگ حسابرسی", icon: "history", perm: "audit.read", render: renderAudit },
 ];
 
 // ------------------------------------------------------------------ ابزارها
@@ -163,7 +166,7 @@ function showError(e) {
 
 // ------------------------------------------------------------------ وضعیت و مسیریابی
 
-const state = { me: null, roles: null, units: null };
+const state = { me: null, roles: null, units: null, jobTitles: new Set() };
 const can = (perm) => !!state.me && state.me.permissions.includes(perm);
 const root = () => document.getElementById("app");
 
@@ -188,6 +191,7 @@ async function logout() {
   store.set("access", null);
   store.set("refresh", null);
   state.me = state.roles = state.units = null;
+  peopleCache = null;
   location.hash = "";
   renderLogin();
 }
@@ -208,17 +212,19 @@ window.addEventListener("hashchange", () => state.me && !state.me.must_change_pa
 function route() {
   const pages = PAGES.filter((p) => can(p.perm));
   if (!pages.length) return renderNoAccess();
-  const id = location.hash.replace(/^#\/?/, "");
-  const page = pages.find((p) => p.id === id) || pages[0];
-  if (page.id !== id) {
+  const [id, ...sub] = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
+  let page = pages.find((p) => p.id === id);
+  if (!page) {
+    page = pages[0];
+    sub.length = 0;
     history.replaceState(null, "", "#/" + page.id);
   }
   const main = h("main", { class: "main" });
-  root().replaceChildren(layout(pages, page), );
+  root().replaceChildren(layout(pages, page));
   root().firstChild.append(main);
   document.title = page.title + " | پنل مدیریت رازی";
-  main.append(h("p", { class: "muted" }, "در حال بارگذاری…"));
-  page.render(main).catch((e) => {
+  main.append(h("div", { class: "loading" }, h("span", { class: "spinner" }), "در حال بارگذاری…"));
+  page.render(main, sub).catch((e) => {
     main.replaceChildren(h("div", { class: "card error" }, e.message || "خطا در بارگذاری"));
   });
 }
@@ -230,11 +236,14 @@ function layout(pages, current) {
     h(
       "aside",
       { class: "sidebar" },
-      h("div", { class: "brand" }, "بیمارستان رازی"),
-      h("div", { class: "who" }, state.me.full_name, h("br"), faDigits(state.me.personnel_code)),
-      h("nav", {}, pages.map((p) => h("a", { href: "#/" + p.id, class: p.id === current.id ? "active" : null }, p.title))),
+      h("div", { class: "brand" }, h("div", { class: "logo" }, icon("school")),
+        h("div", {}, h("div", {}, "بیمارستان رازی"), h("div", { class: "brand-sub" }, "پنل مدیریت"))),
+      h("div", { class: "who" }, h("div", { class: "avatar" }, state.me.full_name.trim().charAt(0)),
+        h("div", {}, h("div", {}, state.me.full_name),
+          h("div", { class: "brand-sub" }, [state.me.job_title, faDigits(state.me.personnel_code)].filter(Boolean).join(" · ")))),
+      h("nav", {}, pages.map((p) => h("a", { href: "#/" + p.id, class: p.id === current.id ? "active" : null }, icon(p.icon), h("span", {}, p.title)))),
       h("div", { class: "spacer" }),
-      h("div", { class: "logout" }, h("button", { class: "btn secondary", onclick: logout }, "خروج")),
+      h("div", { class: "logout" }, h("button", { class: "btn secondary", onclick: logout }, icon("logout"), h("span", {}, "خروج"))),
     ),
   );
 }
@@ -325,8 +334,8 @@ function renderChangePassword(forced) {
 // ------------------------------------------------------------------ پنجره و جدول
 
 /** پنجره فرم. onSave باید true برگرداند تا پنجره بسته شود. */
-function dialog(title, body, { saveLabel = "ذخیره", onSave, extraButtons = [] } = {}) {
-  const dlg = h("dialog");
+function dialog(title, body, { saveLabel = "ذخیره", onSave, extraButtons = [], wide = false } = {}) {
+  const dlg = h("dialog", { class: wide ? "wide" : null });
   const err = h("p", { class: "error" });
   const saveBtn = onSave ? h("button", { class: "btn", type: "submit" }, saveLabel) : null;
   const form = h("form", { method: "dialog", onsubmit: async (ev) => {
@@ -422,14 +431,16 @@ async function renderUsers(main) {
   const list = h("div");
   async function load() {
     const users = await api("/admin/users" + (q.value.trim() ? "?q=" + encodeURIComponent(q.value.trim()) : ""));
+    users.forEach((u) => u.job_title && state.jobTitles.add(u.job_title));
     list.replaceChildren(table(
-      ["کد پرسنلی", "نام", "واحد", "نقش‌ها", "وضعیت", ""],
+      ["کد پرسنلی", "نام", "واحد", "سمت", "نقش‌ها", "وضعیت", ""],
       users.map((u) => ({
         item: u,
         cells: [
           faDigits(u.personnel_code),
           u.full_name,
           unitName(u.unit_id),
+          u.job_title || h("span", { class: "muted" }, "—"),
           u.roles.map((r) => h("span", { class: "tag" }, roleName(r.role) + (r.unit_id ? " (" + unitName(r.unit_id) + ")" : ""))),
           [u.is_active ? h("span", { class: "tag" }, "فعال") : h("span", { class: "tag danger" }, "غیرفعال"),
             u.must_change_password ? h("span", { class: "tag gray" }, "رمز موقت") : null],
@@ -479,12 +490,15 @@ function userDialog(u, reload) {
   const name = h("input", { type: "text", required: true, value: u ? u.full_name : "" });
   const mobile = h("input", { type: "text", dir: "ltr", placeholder: "09xxxxxxxxx", value: u && u.mobile ? u.mobile : "" });
   const unit = select([["", "— بدون واحد —"], ...state.units.map((x) => [x.id, x.name])], u && u.unit_id ? u.unit_id : "");
+  const titleList = h("datalist", { id: "job-titles" }, [...state.jobTitles].sort().map((t) => h("option", { value: t })));
+  const jobTitle = h("input", { type: "text", list: "job-titles", maxlength: "100", placeholder: "مثلاً پرستار، پزشک، بهیار", value: u && u.job_title ? u.job_title : "" });
   const pass = h("input", { type: "text", dir: "ltr", value: isNew ? randomPassword() : "" });
   const active = checkbox("حساب فعال باشد", u ? u.is_active : true);
   const roles = roleRows(u ? u.roles : [{ role: "staff", unit_id: null }]);
   const body = h("div", { class: "form" },
     h("div", { class: "row" }, field("کد پرسنلی", code), field("نام و نام خانوادگی", name)),
     h("div", { class: "row" }, field("موبایل (اختیاری)", mobile), field("واحد محل کار", unit)),
+    field("سمت (برای آمار و هدف‌گذاری آموزش)", h("div", {}, jobTitle, titleList)),
     isNew ? field("رمز موقت (کاربر در اولین ورود باید عوضش کند)", pass) : active.el,
     roles.el,
   );
@@ -494,6 +508,7 @@ function userDialog(u, reload) {
         full_name: name.value.trim(),
         mobile: mobile.value.trim() || null,
         unit_id: unit.value || null,
+        job_title: jobTitle.value.trim() || null,
         roles: roles.value(),
       };
       if (isNew) {

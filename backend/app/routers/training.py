@@ -790,7 +790,7 @@ def admin_exams(_: CurrentUser = Depends(MANAGE), db: Session = Depends(get_db))
             select(ExamAttempt.exam_id, func.count(func.distinct(ExamAttempt.user_id))).group_by(
                 ExamAttempt.exam_id
             )
-        )
+        ).all()
     )
     exams = db.scalars(select(Exam).options(selectinload(Exam.questions)).order_by(Exam.created_at.desc()))
     return [
