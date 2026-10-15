@@ -16,7 +16,7 @@ from app.core.config import get_settings
 from app.core.db import SessionLocal
 from app.core.permissions import DEFAULT_ROLES
 from app.core.security import hash_password
-from app.models import Announcement, Faq, FormTemplate, Role, Unit, User, UserRole
+from app.models import Announcement, Faq, FormTemplate, RequestType, Role, Unit, User, UserRole
 
 INCIDENT_FORM = Path(__file__).parent / "data" / "incident_form.json"
 DEMO_PASSWORD = "Razi1234"
@@ -85,6 +85,7 @@ def seed_demo(db: Session) -> None:
     if db.scalar(select(Unit)) is not None:
         # پایگاه داده قبلاً داده نمایشی دارد؛ فقط موارد تازه (مثل بخش آموزش) افزوده می‌شوند.
         seed_demo_training(db, password)
+        seed_demo_requests(db, password)
         return
     units = {
         "emergency": Unit(
@@ -130,6 +131,7 @@ def seed_demo(db: Session) -> None:
     _user(db, "1005", "مدیر سیستم", units["it"], [("sysadmin", None), ("auditor", None)], password)
     db.flush()
     seed_demo_training(db, password)
+    seed_demo_requests(db, password)
     db.add_all(
         [
             Faq(
@@ -166,6 +168,8 @@ DEMO_JOB_TITLES = {
     "1003": "کارشناس ایمنی بیمار",
     "1004": "کارشناس روابط عمومی",
     "1006": "کارشناس آموزش",
+    "1007": "کارشناس شبکه و سخت‌افزار",
+    "1008": "تکنسین تأسیسات و تجهیزات",
 }
 
 
@@ -182,6 +186,100 @@ def seed_demo_training(db: Session, password: str) -> None:
     for u in db.scalars(select(User).where(User.personnel_code.in_(DEMO_JOB_TITLES))):
         if not u.job_title:
             u.job_title = DEMO_JOB_TITLES[u.personnel_code]
+
+
+def _unit(db: Session, name: str, type_: str) -> Unit:
+    unit = db.scalar(select(Unit).where(Unit.name == name))
+    if unit is None:
+        unit = Unit(name=name, type=type_)
+        db.add(unit)
+        db.flush()
+    return unit
+
+
+def seed_demo_requests(db: Session, password: str) -> None:
+    """واحدهای پشتیبانی، کارشناس‌های نمایشی (1007 و 1008) و چند نوع درخواست نمونه."""
+    it = _unit(db, "فناوری اطلاعات", "support")
+    equipment = _unit(db, "تجهیزات پزشکی", "support")
+    facilities = _unit(db, "تأسیسات", "support")
+    _user(db, "1007", "کارشناس فناوری اطلاعات", it, [("support_agent", it)], password)
+    _user(
+        db,
+        "1008",
+        "تکنسین تأسیسات",
+        facilities,
+        [("support_agent", facilities), ("support_agent", equipment)],
+        password,
+    )
+    db.flush()
+    for u in db.scalars(select(User).where(User.personnel_code.in_(["1007", "1008"]))):
+        if not u.job_title:
+            u.job_title = DEMO_JOB_TITLES[u.personnel_code]
+    if db.scalar(select(RequestType)) is not None:
+        return
+    db.add_all(
+        [
+            RequestType(
+                name="خرابی رایانه یا پرینتر",
+                category="it",
+                handler_unit_id=it.id,
+                sort_order=1,
+                fields=[
+                    {
+                        "id": "device",
+                        "label": "نوع دستگاه",
+                        "kind": "select",
+                        "options": ["رایانه", "پرینتر", "اسکنر", "سایر"],
+                        "required": True,
+                    },
+                    {
+                        "id": "asset_no",
+                        "label": "شماره اموال",
+                        "kind": "text",
+                        "options": [],
+                        "required": False,
+                    },
+                ],
+            ),
+            RequestType(
+                name="مشکل شبکه یا سامانه HIS",
+                category="it",
+                handler_unit_id=it.id,
+                sort_order=2,
+            ),
+            RequestType(
+                name="خرابی تجهیزات پزشکی",
+                category="equipment",
+                handler_unit_id=equipment.id,
+                sort_order=3,
+                fields=[
+                    {"id": "device", "label": "نام دستگاه", "kind": "text", "options": [], "required": True},
+                    {
+                        "id": "asset_no",
+                        "label": "شماره اموال",
+                        "kind": "text",
+                        "options": [],
+                        "required": False,
+                    },
+                ],
+            ),
+            RequestType(
+                name="تأسیسات (برق، آب، سرمایش و گرمایش)",
+                category="facilities",
+                handler_unit_id=facilities.id,
+                sort_order=4,
+                fields=[
+                    {
+                        "id": "kind",
+                        "label": "موضوع",
+                        "kind": "select",
+                        "options": ["برق", "آب و فاضلاب", "سرمایش و گرمایش", "در و پنجره", "سایر"],
+                        "required": True,
+                    }
+                ],
+            ),
+        ]
+    )
 
 
 def run(demo: bool = False) -> None:

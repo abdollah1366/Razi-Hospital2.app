@@ -1,13 +1,10 @@
 """آموزش کارکنان: دوره و محتوا، ثبت بازدید، آزمون و گزارش‌های مسئول آموزش."""
 
 import csv
-import hashlib
 import io
-import os
 import uuid
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Query, Request, Response
@@ -64,6 +61,7 @@ from app.schemas.training import (
     ViewStartOut,
 )
 from app.services import training as svc
+from app.services.media import store_upload
 
 router = APIRouter(tags=["training"])
 
@@ -520,51 +518,19 @@ async def upload_media(
     cu: CurrentUser = Depends(MANAGE),
     db: Session = Depends(get_db),
 ):
-    """بدنه درخواست خود فایل است (نه multipart) تا فایل‌های بزرگ تکه‌تکه روی دیسک نوشته شوند."""
-    name = Path(filename.replace("\\", "/")).name.strip()
-    ext = Path(name).suffix.lower()
-    content_type = svc.ALLOWED_TYPES.get(ext)
-    if not name or content_type is None:
-        raise api_error(400, "file_type", "این نوع فایل پذیرفته نمی‌شود")
-    limit = get_settings().max_upload_mb * 1024 * 1024
-    declared = request.headers.get("content-length")
-    if declared and declared.isdigit() and int(declared) > limit:
-        raise api_error(
-            413, "file_too_large", f"حجم فایل بیشتر از {get_settings().max_upload_mb} مگابایت است"
-        )
-    root = svc.media_root()
-    storage_name = uuid.uuid4().hex + ext
-    tmp = root / (storage_name + ".part")
-    digest = hashlib.sha256()
-    size = 0
-    try:
-        with open(tmp, "wb") as f:
-            async for chunk in request.stream():
-                size += len(chunk)
-                if size > limit:
-                    raise api_error(
-                        413, "file_too_large", f"حجم فایل بیشتر از {get_settings().max_upload_mb} مگابایت است"
-                    )
-                digest.update(chunk)
-                f.write(chunk)
-        if size == 0:
-            raise api_error(400, "empty_file", "فایل خالی است")
-        os.replace(tmp, root / storage_name)
-    finally:
-        if tmp.exists():
-            tmp.unlink()
-    m = MediaFile(
-        original_name=name,
-        content_type=content_type,
-        size=size,
-        sha256=digest.hexdigest(),
-        storage_name=storage_name,
-        uploaded_by=cu.id,
-    )
+    s = get_settings()
+    m = await store_upload(request, filename, svc.ALLOWED_TYPES, s.max_upload_mb, cu.id)
     db.add(m)
     db.flush()
     audit(
-        db, "training.media_uploaded", cu.id, "media", m.id, client_ip(request), size=size, type=content_type
+        db,
+        "training.media_uploaded",
+        cu.id,
+        "media",
+        m.id,
+        client_ip(request),
+        size=m.size,
+        type=m.content_type,
     )
     db.commit()
     return _media_out(m)
