@@ -28,6 +28,8 @@ const PAGES = [
   { id: "dashboard", title: "داشبورد", icon: "dashboard", perm: "dashboard.read", render: renderDashboard },
   { id: "courses", title: "دوره‌های آموزشی", icon: "school", perm: "training.manage", render: renderCourses },
   { id: "exams", title: "آزمون‌ها", icon: "quiz", perm: "training.manage", render: renderExams },
+  { id: "requests", title: "درخواست‌های پشتیبانی", icon: "build", perm: ["request.handle", "request.read"], render: renderRequests },
+  { id: "request-types", title: "انواع درخواست", icon: "category", perm: "request.type.manage", render: renderRequestTypes },
   { id: "users", title: "کاربران", icon: "people", perm: "user.manage", render: renderUsers },
   { id: "units", title: "واحدها", icon: "units", perm: "unit.manage", render: renderUnits },
   { id: "announcements", title: "اطلاعیه‌ها", icon: "bell", perm: "announcement.manage", render: renderAnnouncements },
@@ -167,7 +169,8 @@ function showError(e) {
 // ------------------------------------------------------------------ وضعیت و مسیریابی
 
 const state = { me: null, roles: null, units: null, jobTitles: new Set() };
-const can = (perm) => !!state.me && state.me.permissions.includes(perm);
+const can = (perm) =>
+  !!state.me && (Array.isArray(perm) ? perm.some((p) => state.me.permissions.includes(p)) : state.me.permissions.includes(perm));
 const root = () => document.getElementById("app");
 
 async function catalog() {

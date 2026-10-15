@@ -156,10 +156,10 @@ async function downloadFile(path, fallbackName) {
 }
 
 /** بارگذاری فایل با نوار پیشرفت. بدنه درخواست خود فایل است. */
-function uploadFile(file, onProgress) {
+function uploadFile(file, onProgress, path = "/admin/training/media") {
   const send = () => new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", API + "/admin/training/media?filename=" + encodeURIComponent(file.name));
+    xhr.open("POST", API + path + "?filename=" + encodeURIComponent(file.name));
     xhr.setRequestHeader("Authorization", "Bearer " + store.get("access"));
     xhr.setRequestHeader("Content-Type", "application/octet-stream");
     xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
