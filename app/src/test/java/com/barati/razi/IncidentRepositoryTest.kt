@@ -17,6 +17,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import com.barati.razi.core.network.Result
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -137,5 +138,33 @@ class IncidentRepositoryTest {
     fun formFallsBackToBundledCopyOffline() = runBlocking {
         server.enqueue(MockResponse().setResponseCode(503))
         assertEquals("incident", repo.loadForm().code)
+    }
+
+    @Test
+    fun reviewDetailAndStatusChangeUseServerHints() = runBlocking {
+        server.enqueue(
+            MockResponse().setBody(
+                """{"id":"i1","tracking_code":"IR-1","kind":"error","occurred_on":"2026-10-14","status":"submitted",
+                "answers":{"description":"x"},"sensitive_answers":null,"can_manage":true,
+                "next_statuses":["assigned","rejected","under_review"],"history":[],"actions":[]}""",
+            ),
+        )
+        val detail = (repo.incident("i1") as Result.Ok).value
+        assertTrue(detail.canManage)
+        assertEquals(listOf("assigned", "rejected", "under_review"), detail.nextStatuses)
+        server.takeRequest()
+
+        server.enqueue(
+            MockResponse().setBody(
+                """{"id":"i1","tracking_code":"IR-1","kind":"error","occurred_on":"2026-10-14","status":"under_review",
+                "is_anonymous":false,"created_at":"2026-10-14T10:00:00Z"}""",
+            ),
+        )
+        val changed = repo.changeStatus("i1", "under_review", "  ")
+        assertEquals("under_review", (changed as Result.Ok).value.status)
+        val req = server.takeRequest()
+        assertEquals("/api/v1/incidents/i1/status", req.path)
+        // یادداشت خالی اصلاً فرستاده نمی‌شود.
+        assertEquals("""{"status":"under_review"}""", req.body.readUtf8())
     }
 }

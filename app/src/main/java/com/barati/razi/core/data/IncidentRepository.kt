@@ -1,12 +1,18 @@
 package com.barati.razi.core.data
 
 import com.barati.razi.core.form.FormSchema
+import com.barati.razi.core.network.ActionDto
+import com.barati.razi.core.network.ActionRequest
+import com.barati.razi.core.network.ActionUpdateRequest
 import com.barati.razi.core.network.AppJson
 import com.barati.razi.core.network.ApiService
+import com.barati.razi.core.network.AssignRequest
 import com.barati.razi.core.network.IncidentCreateRequest
 import com.barati.razi.core.network.IncidentDetailDto
+import com.barati.razi.core.network.IncidentPageDto
 import com.barati.razi.core.network.IncidentSummaryDto
 import com.barati.razi.core.network.Result
+import com.barati.razi.core.network.StatusChangeRequest
 import com.barati.razi.core.network.TrackRequest
 import com.barati.razi.core.network.TrackResponse
 import com.barati.razi.core.network.UnitDto
@@ -74,6 +80,22 @@ class IncidentRepository(
     suspend fun myIncidents(): Result<List<IncidentSummaryDto>> = apiCall { api.myIncidents() }
 
     suspend fun incident(id: String): Result<IncidentDetailDto> = apiCall { api.incident(id) }
+
+    // ----- بررسی گزارش‌ها (کارشناس ایمنی / مسئول واحد). مجوزها فقط در سرور بررسی می‌شوند.
+
+    suspend fun reviewList(status: String?): Result<IncidentPageDto> = apiCall { api.incidents(status = status) }
+
+    suspend fun changeStatus(id: String, status: String, note: String?): Result<IncidentSummaryDto> =
+        apiCall { api.changeIncidentStatus(id, StatusChangeRequest(status, note?.trim()?.ifEmpty { null })) }
+
+    suspend fun assign(id: String, unitId: String, note: String?): Result<IncidentSummaryDto> =
+        apiCall { api.assignIncident(id, AssignRequest(unitId, note?.trim()?.ifEmpty { null })) }
+
+    suspend fun addAction(id: String, description: String, owner: String?, dueDate: String?): Result<ActionDto> =
+        apiCall { api.addIncidentAction(id, ActionRequest(description.trim(), owner?.trim()?.ifEmpty { null }, dueDate)) }
+
+    suspend fun setActionDone(id: String, actionId: String, done: Boolean): Result<ActionDto> =
+        apiCall { api.updateIncidentAction(id, actionId, ActionUpdateRequest(done)) }
 
     suspend fun track(code: String, secret: String): Result<TrackResponse> =
         apiCall { api.trackIncident(TrackRequest(code.trim().uppercase(), secret.trim())) }
