@@ -10,10 +10,13 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.barati.razi.AppContainer
 import com.barati.razi.core.data.SessionState
+import com.barati.razi.core.notifications.NotificationLogic
+import com.barati.razi.core.notifications.NotificationTarget
 import com.barati.razi.feature.announcements.AnnouncementsScreen
 import com.barati.razi.feature.auth.ChangePasswordScreen
 import com.barati.razi.feature.auth.LoginScreen
@@ -23,6 +26,7 @@ import com.barati.razi.feature.incident.IncidentFormScreen
 import com.barati.razi.feature.incident.MyIncidentsScreen
 import com.barati.razi.feature.incident.ReviewListScreen
 import com.barati.razi.feature.incident.TrackIncidentScreen
+import com.barati.razi.feature.notifications.NotificationsScreen
 import com.barati.razi.feature.publicinfo.FaqScreen
 import com.barati.razi.feature.publicinfo.FeedbackScreen
 import com.barati.razi.feature.publicinfo.PublicHomeScreen
@@ -63,11 +67,12 @@ object Routes {
     const val REQUESTS = "requests"
     const val REQUEST_NEW = "request_new"
     const val REQUEST_DETAIL = "request/{id}"
+    const val NOTIFICATIONS = "notifications"
 
     /** صفحه‌هایی که بدون نشست معتبر باز نمی‌مانند. */
     val staffOnly = setOf(
         CHANGE_PASSWORD, STAFF_HOME, MY_INCIDENTS, INCIDENT_DETAIL, ANNOUNCEMENTS, REVIEW,
-        TRAINING, COURSE, COURSE_ITEM, EXAM_TAKE, ATTEMPT, REQUESTS, REQUEST_DETAIL,
+        TRAINING, COURSE, COURSE_ITEM, EXAM_TAKE, ATTEMPT, REQUESTS, REQUEST_DETAIL, NOTIFICATIONS,
     )
 
     fun track(code: String = "", secret: String = "") = "track?code=${Uri.encode(code)}&secret=${Uri.encode(secret)}"
@@ -77,6 +82,14 @@ object Routes {
     fun examTake(id: String) = "exam/$id/take"
     fun attempt(id: String) = "attempt/$id"
     fun request(id: String) = "request/$id"
+
+    fun of(target: NotificationTarget): String = when (target) {
+        is NotificationTarget.Request -> request(target.id)
+        is NotificationTarget.Incident -> incident(target.id)
+        is NotificationTarget.Course -> course(target.id)
+        NotificationTarget.Announcements -> ANNOUNCEMENTS
+        NotificationTarget.Training -> TRAINING
+    }
 }
 
 @Composable
@@ -86,6 +99,24 @@ fun RaziNavHost(container: AppContainer, nav: NavHostController = rememberNavCon
     val back: () -> Unit = { nav.popBackStack() }
 
     fun goStaffHome() = nav.navigate(Routes.STAFF_HOME) { popUpTo(Routes.PUBLIC_HOME) }
+
+    // لمس اعلان سیستمی: وقتی کاربر واردشده در بخش کارکنان است (پس از صفحه آغاز)، صفحه همان مورد باز و اعلان خوانده می‌شود.
+    val pendingOpen by container.pendingOpen.collectAsState()
+    val current by nav.currentBackStackEntryAsState()
+    LaunchedEffect(pendingOpen, session, current?.destination?.route) {
+        val open = pendingOpen ?: return@LaunchedEffect
+        val here = current?.destination?.route ?: return@LaunchedEffect
+        val s = session
+        if (s !is SessionState.LoggedIn || here !in Routes.staffOnly || here == Routes.CHANGE_PASSWORD) return@LaunchedEffect
+        container.pendingOpen.value = null
+        open.notificationId?.let { id -> scope.launch { container.notificationRepository.markRead(id) } }
+        val route = if (open.linkType == "notifications") {
+            Routes.NOTIFICATIONS
+        } else {
+            NotificationLogic.target(open.linkType, open.linkId)?.let(Routes::of) ?: Routes.NOTIFICATIONS
+        }
+        nav.navigate(route)
+    }
 
     // اگر نشست منقضی شد، کاربر از صفحه‌های کارکنان به صفحه ورود برده می‌شود.
     LaunchedEffect(session) {
@@ -159,6 +190,7 @@ fun RaziNavHost(container: AppContainer, nav: NavHostController = rememberNavCon
                     onReview = { nav.navigate(Routes.REVIEW) },
                     onTraining = { nav.navigate(Routes.TRAINING) },
                     onRequests = { nav.navigate(Routes.REQUESTS) },
+                    onNotifications = { nav.navigate(Routes.NOTIFICATIONS) },
                     onPublic = { nav.popBackStack(Routes.PUBLIC_HOME, inclusive = false) },
                     onLogout = { scope.launch { container.authRepository.logout() } },
                 )
@@ -247,6 +279,9 @@ fun RaziNavHost(container: AppContainer, nav: NavHostController = rememberNavCon
         }
         composable(Routes.REQUEST_DETAIL, arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
             RequestDetailScreen(container, entry.arguments?.getString("id").orEmpty(), back)
+        }
+        composable(Routes.NOTIFICATIONS) {
+            NotificationsScreen(container, onBack = back, onOpen = { nav.navigate(Routes.of(it)) })
         }
         composable(Routes.ATTEMPT, arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
             AttemptScreen(container, entry.arguments?.getString("id").orEmpty(), back)

@@ -163,4 +163,20 @@ interface ApiService {
 
     @POST("requests/{id}/reopen")
     suspend fun reopenRequest(@Path("id") id: String, @Body body: RequestReopenBody): RequestDetailDto
+
+    @GET("notifications")
+    suspend fun notifications(
+        @Query("before") before: String? = null,
+        @Query("unread_only") unreadOnly: Boolean = false,
+        @Query("limit") limit: Int = 30,
+    ): NotificationPageDto
+
+    @GET("notifications/unread-count")
+    suspend fun unreadNotifications(): UnreadCountDto
+
+    @POST("notifications/{id}/read")
+    suspend fun markNotificationRead(@Path("id") id: String)
+
+    @POST("notifications/read-all")
+    suspend fun markAllNotificationsRead()
 }

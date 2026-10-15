@@ -15,4 +15,6 @@ object Keys {
     const val PENDING_INCIDENTS = "pending_incidents"
     const val LOCAL_ANONYMOUS = "local_anonymous_reports"
     const val PENDING_REQUESTS = "pending_service_requests"
+    const val SHOWN_NOTIFICATIONS = "shown_notifications"
+    const val NOTIFICATION_PERMISSION_ASKED = "notification_permission_asked"
 }

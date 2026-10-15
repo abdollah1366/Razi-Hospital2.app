@@ -7,11 +7,13 @@ import com.barati.razi.core.data.DataStoreKeyValueStore
 import com.barati.razi.core.data.DefaultAuthRepository
 import com.barati.razi.core.data.IncidentRepository
 import com.barati.razi.core.data.Keys
+import com.barati.razi.core.data.NotificationRepository
 import com.barati.razi.core.data.ServiceRequestRepository
 import com.barati.razi.core.data.TrainingRepository
 import com.barati.razi.core.network.HttpFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
@@ -49,6 +51,10 @@ class AppContainer(context: Context) {
     )
 
     val serviceRequestRepository = ServiceRequestRepository(api, store)
+    val notificationRepository = NotificationRepository(api, store)
+
+    /** مقصدی که با لمس اعلان سیستمی باید باز شود؛ صفحه‌ها پس از آماده شدن نشست آن را مصرف می‌کنند. */
+    val pendingOpen = MutableStateFlow<OpenRequest?>(null)
 
     /** ریشه سرور برای پیوند فایل‌های آموزشی (پیوندها نسبی‌اند: /api/v1/training/media/...). */
     private val defaultOrigin: String = BuildConfig.API_BASE_URL.toHttpUrl().let { "${it.scheme}://${it.host}:${it.port}" }
@@ -74,3 +80,6 @@ class AppContainer(context: Context) {
         scope.launch { store.put(Keys.SERVER_ORIGIN, cleaned) }
     }
 }
+
+/** درخواست باز کردن یک اعلان از بیرون اپ (اعلان سیستمی). linkType «notifications» یعنی فهرست اعلان‌ها. */
+data class OpenRequest(val notificationId: String?, val linkType: String?, val linkId: String?)
