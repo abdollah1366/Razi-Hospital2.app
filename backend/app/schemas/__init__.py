@@ -179,9 +179,13 @@ class IncidentDetailOut(IncidentSummaryOut):
     sensitive_answers: dict[str, Any] | None = None
     reporter_name: str | None = None
     assigned_unit_id: uuid.UUID | None
+    assigned_unit_name: str | None = None
     assigned_user_id: uuid.UUID | None
     history: list[StatusChangeOut]
     actions: list[ActionOut]
+    # فقط برای کاربرِ مجاز به مدیریت: اپ بر اساس این‌ها دکمه‌ها را نشان می‌دهد و خودش قواعد را تکرار نمی‌کند.
+    can_manage: bool = False
+    next_statuses: list[str] = []
 
 
 class IncidentPage(BaseModel):

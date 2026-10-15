@@ -241,17 +241,21 @@ def get_incident(
         # 404 به جای 403 تا وجود گزارش برای افراد غیرمجاز آشکار نشود.
         raise api_error(404, "not_found", "گزارش پیدا نشد")
 
-    names = _unit_names(db, {i.unit_id})
+    names = _unit_names(db, {i.unit_id, i.assigned_unit_id} - {None})
     out = IncidentDetailOut(
         **_summary(i, names).model_dump(),
         shift=i.shift,
         answers=i.answers,
         assigned_unit_id=i.assigned_unit_id,
+        assigned_unit_name=names.get(i.assigned_unit_id),
         assigned_user_id=i.assigned_user_id,
         history=[StatusChangeOut.model_validate(h) for h in i.history],
         actions=[ActionOut.model_validate(a) for a in i.actions],
     )
     if is_reader:
+        if _can(cu, "incident.manage", i):
+            out.can_manage = True
+            out.next_statuses = sorted(TRANSITIONS.get(i.status, set()))
         if i.sensitive_answers_encrypted and _can(cu, "incident.sensitive.view", i):
             out.sensitive_answers = json.loads(decrypt_text(i.sensitive_answers_encrypted))
         if i.reporter_id and _can(cu, "incident.reporter.view", i):

@@ -3,6 +3,7 @@ package com.barati.razi.core.network
 import kotlinx.serialization.json.JsonObject
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -61,4 +62,27 @@ interface ApiService {
 
     @GET("incidents/{id}")
     suspend fun incident(@Path("id") id: String): IncidentDetailDto
+
+    @GET("incidents")
+    suspend fun incidents(
+        @Query("status") status: String? = null,
+        @Query("page") page: Int = 1,
+        @Query("size") size: Int = 50,
+    ): IncidentPageDto
+
+    @POST("incidents/{id}/status")
+    suspend fun changeIncidentStatus(@Path("id") id: String, @Body body: StatusChangeRequest): IncidentSummaryDto
+
+    @POST("incidents/{id}/assign")
+    suspend fun assignIncident(@Path("id") id: String, @Body body: AssignRequest): IncidentSummaryDto
+
+    @POST("incidents/{id}/actions")
+    suspend fun addIncidentAction(@Path("id") id: String, @Body body: ActionRequest): ActionDto
+
+    @PATCH("incidents/{id}/actions/{actionId}")
+    suspend fun updateIncidentAction(
+        @Path("id") id: String,
+        @Path("actionId") actionId: String,
+        @Body body: ActionUpdateRequest,
+    ): ActionDto
 }

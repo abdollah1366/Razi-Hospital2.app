@@ -111,12 +111,13 @@ fun DynamicField(field: FormField, answer: Answer?, error: String?, onChange: (A
 /** انتخاب تاریخ شمسی با سه فهرست سال/ماه/روز؛ خروجی میلادی (LocalDate). */
 @Composable
 fun JalaliDateField(value: LocalDate?, onChange: (LocalDate?) -> Unit, maxDate: LocalDate = LocalDate.now()) {
+    val today = LocalDate.now()
     var open by remember { mutableStateOf(false) }
     OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
         Text(value?.let { Jalali.formatLong(it) } ?: "انتخاب تاریخ")
     }
     if (open) {
-        val initial = Jalali.fromGregorian(value ?: maxDate)
+        val initial = Jalali.fromGregorian(value ?: minOf(today, maxDate))
         var year by remember { mutableStateOf(initial.year) }
         var month by remember { mutableStateOf(initial.month) }
         var day by remember { mutableStateOf(initial.day) }
@@ -134,7 +135,9 @@ fun JalaliDateField(value: LocalDate?, onChange: (LocalDate?) -> Unit, maxDate: 
                     Picker("سال", year, ((maxJ.year - 5)..maxJ.year).toList().reversed(), { toPersianDigits(it.toString()) }) {
                         year = it
                     }
-                    if (candidate.isAfter(maxDate)) ErrorText("تاریخ نمی‌تواند بعد از امروز باشد")
+                    if (candidate.isAfter(maxDate)) {
+                        ErrorText(if (maxDate == today) "تاریخ نمی‌تواند بعد از امروز باشد" else "تاریخ خارج از محدوده مجاز است")
+                    }
                 }
             },
             confirmButton = {

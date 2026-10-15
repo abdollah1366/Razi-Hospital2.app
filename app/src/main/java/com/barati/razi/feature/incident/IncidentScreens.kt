@@ -32,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -45,6 +46,9 @@ import com.barati.razi.AppContainer
 import com.barati.razi.core.data.LocalAnonymousReport
 import com.barati.razi.core.data.PendingIncident
 import com.barati.razi.core.form.Answer
+import com.barati.razi.core.form.AnswerRow
+import com.barati.razi.core.form.FormSchema
+import com.barati.razi.core.form.answerRows
 import com.barati.razi.core.network.IncidentSummaryDto
 import com.barati.razi.core.network.Labels
 import com.barati.razi.core.network.Result
@@ -292,15 +296,15 @@ fun MyIncidentsScreen(container: AppContainer, onBack: () -> Unit, onOpen: (Stri
 }
 
 @Composable
-private fun SectionTitle(text: String) {
+internal fun SectionTitle(text: String) {
     Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
 }
 
 @Composable
-private fun IncidentCard(i: IncidentSummaryDto, onClick: () -> Unit) {
+internal fun IncidentCard(i: IncidentSummaryDto, onClick: () -> Unit) {
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(Labels.incidentKinds[i.kind] ?: i.kind, fontWeight = FontWeight.Bold)
+            Text((Labels.incidentKinds[i.kind] ?: i.kind) + if (i.isAnonymous) " (ناشناس)" else "", fontWeight = FontWeight.Bold)
             Text("کد: ${i.trackingCode}  ·  ${i.unitName.orEmpty()}")
             Text("تاریخ وقوع: " + Jalali.formatIso(i.occurredOn))
             StatusText(i.status)
@@ -309,7 +313,7 @@ private fun IncidentCard(i: IncidentSummaryDto, onClick: () -> Unit) {
 }
 
 @Composable
-private fun StatusText(status: String) {
+internal fun StatusText(status: String) {
     Text(
         "وضعیت: " + (Labels.incidentStatus[status] ?: status),
         color = MaterialTheme.colorScheme.primary,
@@ -353,6 +357,8 @@ private fun AnonymousCard(a: LocalAnonymousReport, onTrack: () -> Unit) {
 @Composable
 fun IncidentDetailScreen(container: AppContainer, id: String, onBack: () -> Unit) {
     val loader = rememberLoader(id) { container.incidentRepository.incident(id) }
+    // قالب فرم برای نمایش برچسب فارسی پاسخ‌ها (از سرور یا نسخه ذخیره‌شده).
+    val form by produceState<FormSchema?>(null) { value = container.incidentRepository.loadForm() }
     RaziScaffold(title = "جزئیات گزارش", onBack = onBack) { padding ->
         LoadContent(loader, Modifier.padding(padding)) { d ->
             Column(
@@ -362,18 +368,35 @@ fun IncidentDetailScreen(container: AppContainer, id: String, onBack: () -> Unit
                 Text(Labels.incidentKinds[d.kind] ?: d.kind, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text("کد پیگیری: ${d.trackingCode}")
                 Text("بخش: ${d.unitName.orEmpty()}  ·  تاریخ وقوع: ${Jalali.formatIso(d.occurredOn)}")
+                d.shift?.let { Text("شیفت: " + (Labels.shifts[it] ?: it)) }
                 StatusText(d.status)
-                History(d.history)
-                if (d.actions.isNotEmpty()) {
-                    SectionTitle("اقدامات اصلاحی")
-                    d.actions.forEach { a ->
-                        Card(Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(12.dp)) {
-                                Text(a.description)
-                                Text(if (a.doneAt != null) "انجام شد" else "در حال انجام", style = MaterialTheme.typography.bodySmall)
-                            }
+                d.assignedUnitName?.let { Text("ارجاع به: $it") }
+                when {
+                    d.isAnonymous -> Text("گزارش‌دهنده: ناشناس", style = MaterialTheme.typography.bodySmall)
+                    d.reporterName != null -> Text("گزارش‌دهنده: ${d.reporterName}", style = MaterialTheme.typography.bodySmall)
+                }
+                d.sensitiveAnswers?.let { sensitive ->
+                    Card(
+                        Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    ) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("اطلاعات هویتی بیمار (محرمانه)", fontWeight = FontWeight.Bold)
+                            form?.let { f -> answerRows(f, sensitive).forEach { AnswerLine(it) } }
                         }
                     }
+                }
+                if (d.answers.isNotEmpty()) {
+                    SectionTitle("شرح گزارش")
+                    val f = form
+                    if (f == null) LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) else answerRows(f, d.answers).forEach { AnswerLine(it) }
+                }
+                History(d.history)
+                if (d.actions.isNotEmpty() || d.canManage) SectionTitle("اقدامات اصلاحی")
+                d.actions.forEach { a -> ActionCard(container, d.id, a, d.canManage, onChanged = loader.reload) }
+                if (d.canManage) {
+                    HorizontalDivider()
+                    ManagePanel(container, d, onChanged = loader.reload)
                 }
             }
         }
@@ -381,7 +404,15 @@ fun IncidentDetailScreen(container: AppContainer, id: String, onBack: () -> Unit
 }
 
 @Composable
-private fun History(history: List<StatusChangeDto>) {
+private fun AnswerLine(row: AnswerRow) {
+    Column {
+        Text(row.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(row.value)
+    }
+}
+
+@Composable
+internal fun History(history: List<StatusChangeDto>) {
     SectionTitle("روند رسیدگی")
     history.forEach { h ->
         Text("• " + (Labels.incidentStatus[h.toStatus] ?: h.toStatus) + " — " + Jalali.formatIso(h.at))

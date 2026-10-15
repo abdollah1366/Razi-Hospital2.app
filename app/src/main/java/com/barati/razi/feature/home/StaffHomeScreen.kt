@@ -9,6 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.ReportProblem
@@ -39,6 +40,7 @@ fun StaffHomeScreen(
     onNewIncident: () -> Unit,
     onMyIncidents: () -> Unit,
     onAnnouncements: () -> Unit,
+    onReview: () -> Unit,
     onPublic: () -> Unit,
     onLogout: () -> Unit,
 ) {
@@ -67,6 +69,9 @@ fun StaffHomeScreen(
                     Icons.Filled.ListAlt,
                     onMyIncidents,
                 )
+            }
+            if (me.can("incident.read")) {
+                MenuTile("بررسی گزارش‌ها", "گزارش‌های خطای واحد یا کل بیمارستان", Icons.Filled.FactCheck, onReview)
             }
             if (me.can("announcement.read")) {
                 MenuTile(

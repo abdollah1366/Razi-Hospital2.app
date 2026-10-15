@@ -21,6 +21,7 @@ import com.barati.razi.feature.home.StaffHomeScreen
 import com.barati.razi.feature.incident.IncidentDetailScreen
 import com.barati.razi.feature.incident.IncidentFormScreen
 import com.barati.razi.feature.incident.MyIncidentsScreen
+import com.barati.razi.feature.incident.ReviewListScreen
 import com.barati.razi.feature.incident.TrackIncidentScreen
 import com.barati.razi.feature.publicinfo.FaqScreen
 import com.barati.razi.feature.publicinfo.FeedbackScreen
@@ -45,9 +46,10 @@ object Routes {
     const val MY_INCIDENTS = "my_incidents"
     const val INCIDENT_DETAIL = "incident/{id}"
     const val ANNOUNCEMENTS = "announcements"
+    const val REVIEW = "review"
 
     /** صفحه‌هایی که بدون نشست معتبر باز نمی‌مانند. */
-    val staffOnly = setOf(CHANGE_PASSWORD, STAFF_HOME, MY_INCIDENTS, INCIDENT_DETAIL, ANNOUNCEMENTS)
+    val staffOnly = setOf(CHANGE_PASSWORD, STAFF_HOME, MY_INCIDENTS, INCIDENT_DETAIL, ANNOUNCEMENTS, REVIEW)
 
     fun track(code: String = "", secret: String = "") = "track?code=${Uri.encode(code)}&secret=${Uri.encode(secret)}"
     fun incident(id: String) = "incident/$id"
@@ -130,6 +132,7 @@ fun RaziNavHost(container: AppContainer, nav: NavHostController = rememberNavCon
                     onNewIncident = { nav.navigate(Routes.INCIDENT_NEW) },
                     onMyIncidents = { nav.navigate(Routes.MY_INCIDENTS) },
                     onAnnouncements = { nav.navigate(Routes.ANNOUNCEMENTS) },
+                    onReview = { nav.navigate(Routes.REVIEW) },
                     onPublic = { nav.popBackStack(Routes.PUBLIC_HOME, inclusive = false) },
                     onLogout = { scope.launch { container.authRepository.logout() } },
                 )
@@ -153,5 +156,6 @@ fun RaziNavHost(container: AppContainer, nav: NavHostController = rememberNavCon
             IncidentDetailScreen(container, entry.arguments?.getString("id").orEmpty(), back)
         }
         composable(Routes.ANNOUNCEMENTS) { AnnouncementsScreen(container, back) }
+        composable(Routes.REVIEW) { ReviewListScreen(container, back, onOpen = { nav.navigate(Routes.incident(it)) }) }
     }
 }

@@ -175,6 +175,23 @@ def test_workflow_assign_action_close(client, db):
     assert summary["avg_hours_to_close"] is not None
 
 
+def test_detail_tells_app_what_it_may_do(client, db):
+    r, _ = report(client, db)
+    iid = r.json()["id"]
+    url = f"/api/v1/incidents/{iid}"
+    safety = client.get(url, headers=auth(client, SAFETY)).json()
+    assert safety["can_manage"] is True
+    assert safety["next_statuses"] == ["assigned", "rejected", "under_review"]
+    for code in (UNIT_MANAGER, STAFF):
+        d = client.get(url, headers=auth(client, code)).json()
+        assert d["can_manage"] is False and d["next_statuses"] == []
+    h = auth(client, SAFETY)
+    client.post(f"{url}/assign", headers=h, json={"unit_id": unit_id(db, "ICU")})
+    d = client.get(url, headers=h).json()
+    assert d["assigned_unit_name"] == "ICU"
+    assert d["next_statuses"] == ["in_progress", "under_review"]
+
+
 def test_form_endpoint(client):
     form = client.get("/api/v1/forms/incident", headers=auth(client, STAFF)).json()
     assert form["version"] == 1 and form["sections"]

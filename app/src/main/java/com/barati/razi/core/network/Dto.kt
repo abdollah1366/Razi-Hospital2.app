@@ -154,9 +154,43 @@ data class IncidentDetailDto(
     @SerialName("unit_name") val unitName: String? = null,
     @SerialName("occurred_on") val occurredOn: String,
     val status: String,
+    @SerialName("is_anonymous") val isAnonymous: Boolean = false,
+    @SerialName("created_at") val createdAt: String? = null,
+    val shift: String? = null,
+    val answers: JsonObject = JsonObject(emptyMap()),
+    // فقط برای کاربران دارای مجوز؛ برای بقیه null است.
+    @SerialName("sensitive_answers") val sensitiveAnswers: JsonObject? = null,
+    @SerialName("reporter_name") val reporterName: String? = null,
+    @SerialName("assigned_unit_name") val assignedUnitName: String? = null,
     val history: List<StatusChangeDto> = emptyList(),
     val actions: List<ActionDto> = emptyList(),
+    @SerialName("can_manage") val canManage: Boolean = false,
+    @SerialName("next_statuses") val nextStatuses: List<String> = emptyList(),
 )
+
+@Serializable
+data class IncidentPageDto(
+    val items: List<IncidentSummaryDto>,
+    val total: Int,
+    val page: Int,
+    val size: Int,
+)
+
+@Serializable
+data class StatusChangeRequest(val status: String, val note: String? = null)
+
+@Serializable
+data class AssignRequest(@SerialName("unit_id") val unitId: String, val note: String? = null)
+
+@Serializable
+data class ActionRequest(
+    val description: String,
+    @SerialName("owner_name") val ownerName: String? = null,
+    @SerialName("due_date") val dueDate: String? = null,
+)
+
+@Serializable
+data class ActionUpdateRequest(val done: Boolean)
 
 @Serializable
 data class TrackRequest(
