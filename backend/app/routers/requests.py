@@ -36,6 +36,7 @@ from app.schemas.requests import (
     StatusIn,
     TransferIn,
 )
+from app.services import notifications as notes
 from app.services import requests as svc
 from app.services.media import store_upload
 from app.services.training import sign_media
@@ -301,6 +302,16 @@ def create_request(
     db.add(r)
     db.flush()
     db.add(ServiceRequestEvent(request_id=r.id, actor_id=cu.id, kind="created", to_status="submitted"))
+    _notify(
+        db,
+        r,
+        cu,
+        [u.id for u in _agents(db, r.handler_unit_id)],
+        "request.new",
+        f"درخواست جدید: {t.name}",
+        body=f"{r.tracking_code} · {r.description}",
+        important=r.priority != "normal",
+    )
     audit(db, "request.created", cu.id, "service_request", r.id, client_ip(request), priority=r.priority)
     db.commit()
     return RequestCreatedOut(id=r.id, tracking_code=r.tracking_code, status=r.status)
@@ -525,6 +536,23 @@ def _event(r: ServiceRequest, cu: CurrentUser, kind: str, **kw) -> None:
     r.updated_at = _now()
 
 
+def _notify(db: Session, r: ServiceRequest, cu: CurrentUser, to: list, kind: str, title: str, **kw) -> None:
+    notes.notify(db, to, kind, title, link_type="request", link_id=r.id, actor_id=cu.id, **kw)
+
+
+def _handlers(db: Session, r: ServiceRequest) -> list[uuid.UUID]:
+    """کارشناس مسئول؛ اگر هنوز کسی برنداشته، همه کارشناسان واحد مسئول."""
+    if r.assigned_to_id:
+        return [r.assigned_to_id]
+    return [u.id for u in _agents(db, r.handler_unit_id)]
+
+
+def _other_side(db: Session, r: ServiceRequest, cu: CurrentUser) -> list[uuid.UUID]:
+    if cu.id == r.requester_id:
+        return _handlers(db, r)
+    return [r.requester_id, r.assigned_to_id]
+
+
 @router.get("/requests/{request_id}", response_model=RequestDetailOut)
 def get_request(request_id: uuid.UUID, cu: CurrentUser = Depends(VIEW), db: Session = Depends(get_db)):
     now = _now()
@@ -560,6 +588,15 @@ def change_status(
     if body.status == "rejected":
         r.closed_at = now
     _event(r, cu, "status", from_status=old, to_status=body.status, note=(body.note or "").strip() or None)
+    _notify(
+        db,
+        r,
+        cu,
+        [r.requester_id],
+        "request.status",
+        f"درخواست {r.tracking_code}: {svc.STATUSES[body.status]}",
+        body=r.resolution if body.status == "done" else body.note,
+    )
     audit(db, "request.status", cu.id, "service_request", r.id, client_ip(request), status=body.status)
     db.commit()
     return _detail(db, cu, r, now)
@@ -598,6 +635,15 @@ def assign_request(
     r.assigned_to_id = body.user_id
     target = db.get(User, body.user_id) if body.user_id else None
     _event(r, cu, "assign", note=target.full_name if target else "بدون کارشناس")
+    _notify(
+        db,
+        r,
+        cu,
+        [body.user_id],
+        "request.assigned",
+        f"درخواست {r.tracking_code} به شما ارجاع شد",
+        body=r.description,
+    )
     audit(db, "request.assigned", cu.id, "service_request", r.id, client_ip(request))
     db.commit()
     return _detail(db, cu, r, _now())
@@ -625,6 +671,16 @@ def transfer_request(
     _event(
         r, cu, "transfer", from_status=old, to_status="submitted", note=f"{target.name}: {body.note.strip()}"
     )
+    _notify(
+        db,
+        r,
+        cu,
+        [u.id for u in _agents(db, target.id)],
+        "request.transferred",
+        f"درخواست ارجاعی {r.tracking_code} به واحد شما",
+        body=body.note,
+        important=r.priority != "normal",
+    )
     audit(db, "request.transferred", cu.id, "service_request", r.id, client_ip(request), unit=str(target.id))
     db.commit()
     # کارشناس واحد قبلی ممکن است دیگر دسترسی نداشته باشد؛ خلاصه برمی‌گردد تا اپ صفحه را ببندد.
@@ -641,6 +697,15 @@ def comment_request(
     if "comment" not in svc.actions_for(cu, r, _now()):
         raise api_error(403, "forbidden", "امکان نوشتن یادداشت روی این درخواست نیست")
     _event(r, cu, "comment", note=body.text.strip())
+    _notify(
+        db,
+        r,
+        cu,
+        _other_side(db, r, cu),
+        "request.comment",
+        f"پیام تازه در درخواست {r.tracking_code}",
+        body=body.text,
+    )
     db.commit()
     return _detail(db, cu, r, _now())
 
@@ -660,6 +725,9 @@ async def attach_to_request(
     db.add(m)
     db.flush()
     _event(r, cu, "attachment", media_id=m.id)
+    _notify(
+        db, r, cu, _other_side(db, r, cu), "request.attachment", f"پیوست تازه در درخواست {r.tracking_code}"
+    )
     audit(db, "request.attachment", cu.id, "service_request", r.id, client_ip(request), size=m.size)
     db.commit()
     db.refresh(r)
@@ -685,6 +753,15 @@ def rate_request(
         r.status = "closed"
         r.closed_at = now
     _event(r, cu, "rated", from_status=old, to_status=r.status, note=r.satisfaction_comment)
+    _notify(
+        db,
+        r,
+        cu,
+        [r.assigned_to_id],
+        "request.rated",
+        f"امتیاز درخواست {r.tracking_code}: {'★' * body.score}{'☆' * (5 - body.score)}",
+        body=r.satisfaction_comment,
+    )
     audit(db, "request.rated", cu.id, "service_request", r.id, client_ip(request), score=body.score)
     db.commit()
     return _detail(db, cu, r, now)
@@ -709,6 +786,16 @@ def reopen_request(
     r.satisfaction = None
     r.satisfaction_comment = None
     _event(r, cu, "reopened", from_status=old, to_status=r.status, note=body.note.strip())
+    _notify(
+        db,
+        r,
+        cu,
+        _handlers(db, r),
+        "request.reopened",
+        f"اعتراض به نتیجه درخواست {r.tracking_code}",
+        body=body.note,
+        important=True,
+    )
     audit(db, "request.reopened", cu.id, "service_request", r.id, client_ip(request))
     db.commit()
     return _detail(db, cu, r, now)

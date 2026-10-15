@@ -60,6 +60,7 @@ from app.schemas.training import (
     ViewProgressIn,
     ViewStartOut,
 )
+from app.services import notifications as notes
 from app.services import training as svc
 from app.services.media import store_upload
 
@@ -575,6 +576,51 @@ def admin_courses(_: CurrentUser = Depends(MANAGE), db: Session = Depends(get_db
     return out
 
 
+def _sync_course_notes(db: Session, c: Course, cu: CurrentUser) -> None:
+    """دوره منتشرشده به مخاطبانش اعلام می‌شود (هر نفر یک بار)؛ دوره برگشته از انتشار اعلان خوانده‌نشده ندارد."""
+    db.flush()
+    if c.status != "published":
+        notes.retract(db, c.id)
+        return
+    notes.notify(
+        db,
+        [u.id for u, _ in svc.audience_of(db, c)],
+        "training.course",
+        f"دوره آموزشی جدید: {c.title}",
+        body=("دوره الزامی · " if c.is_mandatory else "") + (c.description or ""),
+        link_type="course",
+        link_id=c.id,
+        important=c.is_mandatory,
+        actor_id=cu.id,
+        once=True,
+    )
+
+
+def _sync_exam_notes(db: Session, e: Exam, cu: CurrentUser) -> None:
+    """اعلان «آزمون باز شد» در لحظه باز شدن آزمون دیده می‌شود؛ با تغییر زمان یا وضعیت آزمون هماهنگ می‌ماند."""
+    db.flush()
+    now = datetime.now(UTC)
+    state = svc.exam_state(e, now)
+    if state not in ("open", "upcoming"):
+        notes.retract(db, e.id, only_future=state == "closed", now=now)
+        return
+    at = e.opens_at if state == "upcoming" else now
+    notes.reschedule(db, "training.exam", e.id, at, now)
+    notes.notify(
+        db,
+        [u.id for u, _ in svc.audience_of(db, e)],
+        "training.exam",
+        f"آزمون باز شد: {e.title}",
+        body=e.description,
+        link_type="exam",
+        link_id=e.id,
+        important=True,
+        at=at,
+        actor_id=cu.id,
+        once=True,
+    )
+
+
 @router.post("/admin/training/courses", response_model=CourseDetailOut, status_code=201)
 def create_course(
     body: CourseIn, request: Request, cu: CurrentUser = Depends(MANAGE), db: Session = Depends(get_db)
@@ -592,6 +638,7 @@ def create_course(
     _apply_audience(c, body)
     db.add(c)
     db.flush()
+    _sync_course_notes(db, c, cu)
     audit(db, "training.course_created", cu.id, "course", c.id, client_ip(request), status=c.status)
     db.commit()
     return _admin_course_detail(db, c)
@@ -632,6 +679,7 @@ def update_course(
         if field in data:
             setattr(c, field, data[field].strip() if field == "title" else data[field])
     _apply_audience(c, body)
+    _sync_course_notes(db, c, cu)
     audit(db, "training.course_updated", cu.id, "course", c.id, client_ip(request), fields=sorted(data))
     db.commit()
     return _admin_course_detail(db, c)
@@ -785,6 +833,7 @@ def create_exam(
     _apply_audience(e, body)
     db.add(e)
     db.flush()
+    _sync_exam_notes(db, e, cu)
     audit(db, "training.exam_created", cu.id, "exam", e.id, client_ip(request))
     db.commit()
     return _admin_exam_detail(db, e)
@@ -819,6 +868,7 @@ def update_exam(
     if e.opens_at and e.closes_at and e.closes_at <= e.opens_at:
         raise api_error(400, "invalid_dates", "زمان بسته شدن باید بعد از زمان باز شدن باشد")
     _apply_audience(e, body)
+    _sync_exam_notes(db, e, cu)
     audit(
         db,
         "training.exam_updated",

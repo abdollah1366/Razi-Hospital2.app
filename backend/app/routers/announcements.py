@@ -10,6 +10,7 @@ from app.core.db import get_db
 from app.core.deps import CurrentUser, api_error, build_current_user, client_ip, require
 from app.models import Announcement, AnnouncementRead, User
 from app.schemas import AnnouncementIn, AnnouncementOut, ReadStatsOut
+from app.services import notifications as notes
 
 router = APIRouter(tags=["announcements"])
 
@@ -29,6 +30,12 @@ def _targets(a: Announcement, role_codes: set[str], unit_id: uuid.UUID | None) -
     if a.target_unit_ids and (unit_id is None or str(unit_id) not in a.target_unit_ids):
         return False
     return True
+
+
+def _staff(db: Session) -> list[tuple[User, CurrentUser]]:
+    """کاربران فعالی که اطلاعیه داخلی می‌خوانند."""
+    users = db.scalars(select(User).where(User.is_active.is_(True)).options(selectinload(User.roles)))
+    return [(u, cu) for u in users if (cu := build_current_user(u)).has("announcement.read")]
 
 
 def _out(a: Announcement, read: AnnouncementRead | None = None, with_state: bool = False) -> AnnouncementOut:
@@ -139,6 +146,19 @@ def create_announcement(
     a = Announcement(author_id=cu.id, **data)
     db.add(a)
     db.flush()
+    if a.audience == "staff":
+        notes.notify(
+            db,
+            [u.id for u, ucu in _staff(db) if _targets(a, ucu.role_codes, u.unit_id)],
+            "announcement",
+            a.title,
+            body=a.body,
+            link_type="announcement",
+            link_id=a.id,
+            important=a.is_important or a.requires_ack,
+            at=a.published_at,
+            actor_id=cu.id,
+        )
     audit(db, "announcement.created", cu.id, "announcement", a.id, client_ip(request))
     db.commit()
     return _out(a)
@@ -167,6 +187,7 @@ def expire_announcement(
     if a is None:
         raise api_error(404, "not_found", "اطلاعیه پیدا نشد")
     a.expires_at = datetime.now(UTC)
+    notes.retract(db, a.id)
     audit(db, "announcement.expired", cu.id, "announcement", a.id, client_ip(request))
     db.commit()
 
@@ -186,12 +207,10 @@ def read_stats(
         r.user_id: r
         for r in db.scalars(select(AnnouncementRead).where(AnnouncementRead.announcement_id == a.id))
     }
-    users = db.scalars(select(User).where(User.is_active.is_(True)).options(selectinload(User.roles)))
     targeted = read = acked = 0
     missing: list[str] = []
-    for u in users:
-        cu = build_current_user(u)
-        if not cu.has("announcement.read") or not _targets(a, cu.role_codes, u.unit_id):
+    for u, cu in _staff(db):
+        if not _targets(a, cu.role_codes, u.unit_id):
             continue
         targeted += 1
         r = reads.get(u.id)

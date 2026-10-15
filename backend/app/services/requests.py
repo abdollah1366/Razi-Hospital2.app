@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import CurrentUser
 from app.models import ServiceRequest, ServiceRequestEvent
+from app.services.notifications import notify
 
 CATEGORIES = {"it": "فناوری اطلاعات", "equipment": "تجهیزات پزشکی", "facilities": "تأسیسات", "other": "سایر"}
 PRIORITIES = {"normal": "عادی", "urgent": "فوری", "critical": "بحرانی"}
@@ -121,4 +122,14 @@ def close_stale(db: Session, now: datetime) -> None:
                 to_status="closed",
                 note="بسته شدن خودکار پس از ۳ روز",
             )
+        )
+        notify(
+            db,
+            [r.requester_id],
+            "request.status",
+            f"درخواست {r.tracking_code}: {STATUSES['closed']}",
+            body="بسته شدن خودکار پس از ۳ روز",
+            link_type="request",
+            link_id=r.id,
+            at=r.closed_at,
         )

@@ -8,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -440,3 +441,25 @@ class ServiceRequestEvent(Base):
     media_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("media_files.id"))
 
     media: Mapped[MediaFile | None] = relationship(lazy="joined")
+
+
+# ---------------------------------------------------------------- اعلان‌ها
+
+
+class Notification(Base):
+    """اعلان درون‌برنامه‌ای یک کاربر. created_at آینده یعنی اعلان زمان‌دار که تا آن لحظه دیده نمی‌شود."""
+
+    __tablename__ = "notifications"
+    id: Mapped[uuid.UUID] = pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    kind: Mapped[str] = mapped_column(String(40))
+    title: Mapped[str] = mapped_column(String(300))
+    body: Mapped[str | None] = mapped_column(String(500))
+    # request | incident | announcement | course | exam
+    link_type: Mapped[str | None] = mapped_column(String(20))
+    link_id: Mapped[uuid.UUID | None] = mapped_column(index=True)
+    important: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (Index("ix_notifications_user_created", "user_id", "created_at"),)

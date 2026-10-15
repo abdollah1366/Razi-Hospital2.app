@@ -7,7 +7,17 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import get_settings
-from app.routers import admin, announcements, auth, dashboard, incidents, public, requests, training
+from app.routers import (
+    admin,
+    announcements,
+    auth,
+    dashboard,
+    incidents,
+    notifications,
+    public,
+    requests,
+    training,
+)
 
 API_PREFIX = "/api/v1"
 ADMIN_WEB_DIR = Path(__file__).parent / "admin_web"
@@ -61,6 +71,7 @@ def create_app() -> FastAPI:
         dashboard.router,
         training.router,
         requests.router,
+        notifications.router,
     ):
         app.include_router(r, prefix=API_PREFIX)
 
