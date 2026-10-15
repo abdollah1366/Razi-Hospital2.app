@@ -61,6 +61,28 @@ New-NetFirewallRule -DisplayName "Razi API 8000" -Direction Inbound -Protocol TC
 - در اپ (نسخه debug) در صفحه ورود «تغییر آدرس سرور» ← `http://IP-سرور:8000`، سپس ورود با کد 1001 و رمز نمایشی مرحله ۲.
 - پنل مدیریت وب در مرورگر: `http://IP-سرور:8000/admin` (کاربران و واحدها با 1005، اطلاعیه‌ها با 1004، داشبورد با 1003). اتصال HTTP رمزنگاری نشده است؛ فقط با داده آزمایشی کار کنید.
 
+## ۸. اجرای خودکار با روشن شدن سرور
+
+برای اینکه بعد از ری‌استارت VPS لازم نباشد سرور را دستی اجرا کنید، یک بار PowerShell را با **Run as administrator** باز کنید. اگر سرور در پنجره دیگری در حال اجراست، اول آنجا `Ctrl+C` بزنید. بعد این دستورها را اجرا کنید:
+
+```powershell
+cd C:\razi\backend
+.venv\Scripts\python scripts\autostart.py install
+```
+
+از این به بعد سرور در هر بار روشن شدن ویندوز، حدود یک دقیقه بعد (تا PostgreSQL بالا بیاید) خودکار اجرا می‌شود. لازم نیست کسی وارد ویندوز شود. اگر سرور به هر دلیلی بسته شود، بعد از ۵ ثانیه دوباره اجرا می‌شود. گزارش اجرا در `C:\razi\backend\logs\server.log` نوشته می‌شود.
+
+دستورهای دیگر (همه در PowerShell مدیر و در پوشه `C:\razi\backend`):
+
+| کار | دستور |
+|---|---|
+| وضعیت | `.venv\Scripts\python scripts\autostart.py status` |
+| توقف | `.venv\Scripts\python scripts\autostart.py stop` |
+| اجرای دوباره | `.venv\Scripts\python scripts\autostart.py start` |
+| حذف اجرای خودکار | `.venv\Scripts\python scripts\autostart.py remove` |
+
 ## به‌روزرسانی کد
 
 ZIP جدید را باز کنید، فایل `backend\.env` قبلی را به پوشه جدید کپی کنید، سپس مرحله‌های ۲ (به جز دستور آخر)، ۴ و ۵ را دوباره اجرا کنید.
+
+اگر اجرای خودکار (مرحله ۸) فعال است، به جای مرحله ۵ قبل از کپی فایل‌ها `autostart.py stop` و بعد از نصب `autostart.py start` را اجرا کنید.

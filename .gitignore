@@ -24,3 +24,6 @@ venv/
 # secrets
 .env
 .env.public
+
+# server logs
+backend/logs/
