@@ -5,6 +5,7 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -85,4 +86,31 @@ interface ApiService {
         @Path("actionId") actionId: String,
         @Body body: ActionUpdateRequest,
     ): ActionDto
+
+    @GET("training/courses")
+    suspend fun trainingCourses(): List<CourseDto>
+
+    @GET("training/courses/{id}")
+    suspend fun trainingCourse(@Path("id") id: String): CourseDto
+
+    @POST("training/items/{id}/views")
+    suspend fun startView(@Path("id") itemId: String): ViewStartDto
+
+    @PATCH("training/views/{id}")
+    suspend fun updateView(@Path("id") viewId: String, @Body body: ViewProgressRequest)
+
+    @GET("training/exams")
+    suspend fun trainingExams(): List<ExamDto>
+
+    @POST("training/exams/{id}/attempts")
+    suspend fun startAttempt(@Path("id") examId: String): AttemptDto
+
+    @GET("training/attempts/{id}")
+    suspend fun attempt(@Path("id") id: String): AttemptDto
+
+    @PUT("training/attempts/{id}/answers")
+    suspend fun saveAnswers(@Path("id") id: String, @Body body: AnswersRequest): AttemptDto
+
+    @POST("training/attempts/{id}/submit")
+    suspend fun submitAttempt(@Path("id") id: String, @Body body: AnswersRequest): AttemptDto
 }

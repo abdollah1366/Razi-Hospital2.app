@@ -191,6 +191,8 @@ def test_exam_window_group_grading_and_answer_visibility(client):
     ).json()
     assert res["finished"] and res["score"] == 75.0 and res["passed"] is True
     assert res["answers_visible"] is False
+    mine = client.get(f"{API}/training/exams", headers=staff).json()[0]
+    assert mine["last_attempt_id"] == a["id"] and mine["in_progress_attempt_id"] is None
 
     r = client.post(f"{API}/training/exams/{exam['id']}/attempts", headers=staff)
     assert r.status_code == 409 and r.json()["detail"]["code"] == "no_attempts_left"

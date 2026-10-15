@@ -28,6 +28,11 @@ import com.barati.razi.feature.publicinfo.FeedbackScreen
 import com.barati.razi.feature.publicinfo.PublicHomeScreen
 import com.barati.razi.feature.publicinfo.PublicNewsScreen
 import com.barati.razi.feature.publicinfo.UnitsScreen
+import com.barati.razi.feature.training.AttemptScreen
+import com.barati.razi.feature.training.CourseItemScreen
+import com.barati.razi.feature.training.CourseScreen
+import com.barati.razi.feature.training.ExamTakeScreen
+import com.barati.razi.feature.training.TrainingHomeScreen
 import com.barati.razi.ui.components.LoadingBox
 import kotlinx.coroutines.launch
 
@@ -47,12 +52,24 @@ object Routes {
     const val INCIDENT_DETAIL = "incident/{id}"
     const val ANNOUNCEMENTS = "announcements"
     const val REVIEW = "review"
+    const val TRAINING = "training"
+    const val COURSE = "course/{id}"
+    const val COURSE_ITEM = "course/{courseId}/item/{itemId}"
+    const val EXAM_TAKE = "exam/{id}/take"
+    const val ATTEMPT = "attempt/{id}"
 
     /** صفحه‌هایی که بدون نشست معتبر باز نمی‌مانند. */
-    val staffOnly = setOf(CHANGE_PASSWORD, STAFF_HOME, MY_INCIDENTS, INCIDENT_DETAIL, ANNOUNCEMENTS, REVIEW)
+    val staffOnly = setOf(
+        CHANGE_PASSWORD, STAFF_HOME, MY_INCIDENTS, INCIDENT_DETAIL, ANNOUNCEMENTS, REVIEW,
+        TRAINING, COURSE, COURSE_ITEM, EXAM_TAKE, ATTEMPT,
+    )
 
     fun track(code: String = "", secret: String = "") = "track?code=${Uri.encode(code)}&secret=${Uri.encode(secret)}"
     fun incident(id: String) = "incident/$id"
+    fun course(id: String) = "course/$id"
+    fun courseItem(courseId: String, itemId: String) = "course/$courseId/item/$itemId"
+    fun examTake(id: String) = "exam/$id/take"
+    fun attempt(id: String) = "attempt/$id"
 }
 
 @Composable
@@ -133,6 +150,7 @@ fun RaziNavHost(container: AppContainer, nav: NavHostController = rememberNavCon
                     onMyIncidents = { nav.navigate(Routes.MY_INCIDENTS) },
                     onAnnouncements = { nav.navigate(Routes.ANNOUNCEMENTS) },
                     onReview = { nav.navigate(Routes.REVIEW) },
+                    onTraining = { nav.navigate(Routes.TRAINING) },
                     onPublic = { nav.popBackStack(Routes.PUBLIC_HOME, inclusive = false) },
                     onLogout = { scope.launch { container.authRepository.logout() } },
                 )
@@ -157,5 +175,48 @@ fun RaziNavHost(container: AppContainer, nav: NavHostController = rememberNavCon
         }
         composable(Routes.ANNOUNCEMENTS) { AnnouncementsScreen(container, back) }
         composable(Routes.REVIEW) { ReviewListScreen(container, back, onOpen = { nav.navigate(Routes.incident(it)) }) }
+        composable(Routes.TRAINING) {
+            TrainingHomeScreen(
+                container,
+                onBack = back,
+                onCourse = { nav.navigate(Routes.course(it)) },
+                onTakeExam = { nav.navigate(Routes.examTake(it)) },
+                onAttempt = { nav.navigate(Routes.attempt(it)) },
+            )
+        }
+        composable(Routes.COURSE, arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
+            val courseId = entry.arguments?.getString("id").orEmpty()
+            CourseScreen(
+                container,
+                courseId,
+                onBack = back,
+                onItem = { nav.navigate(Routes.courseItem(courseId, it)) },
+                onTakeExam = { nav.navigate(Routes.examTake(it)) },
+                onAttempt = { nav.navigate(Routes.attempt(it)) },
+            )
+        }
+        composable(
+            Routes.COURSE_ITEM,
+            arguments = listOf(
+                navArgument("courseId") { type = NavType.StringType },
+                navArgument("itemId") { type = NavType.StringType },
+            ),
+        ) { entry ->
+            val courseId = entry.arguments?.getString("courseId").orEmpty()
+            CourseItemScreen(
+                container,
+                courseId,
+                entry.arguments?.getString("itemId").orEmpty(),
+                onBack = back,
+                // محتوای قبلی/بعدی جای صفحه فعلی را می‌گیرد تا «بازگشت» مستقیم به دوره برگردد.
+                onOpenItem = { nav.navigate(Routes.courseItem(courseId, it)) { popUpTo(Routes.COURSE_ITEM) { inclusive = true } } },
+            )
+        }
+        composable(Routes.EXAM_TAKE, arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
+            ExamTakeScreen(container, entry.arguments?.getString("id").orEmpty(), back)
+        }
+        composable(Routes.ATTEMPT, arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
+            AttemptScreen(container, entry.arguments?.getString("id").orEmpty(), back)
+        }
     }
 }
