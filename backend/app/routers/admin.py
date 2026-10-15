@@ -56,8 +56,12 @@ def _set_roles(db: Session, user: User, roles: list[RoleAssignment]) -> None:
     user.roles.extend(new_roles)
 
 
+# فهرست نقش‌ها و واحدها برای فرم‌های پنل (انتساب نقش، هدف‌گذاری اطلاعیه، نمایش نام واحد) هم لازم است.
+_CATALOG_READERS = ("user.manage", "unit.manage", "announcement.manage", "feedback.manage")
+
+
 @router.get("/roles", response_model=list[RoleOut])
-def list_roles(_: CurrentUser = Depends(require("user.manage")), db: Session = Depends(get_db)):
+def list_roles(_: CurrentUser = Depends(require(*_CATALOG_READERS)), db: Session = Depends(get_db)):
     return [RoleOut(code=r.code, name=r.name, permissions=r.permissions) for r in db.scalars(select(Role))]
 
 
@@ -155,7 +159,7 @@ def reset_password(
 
 
 @router.get("/units", response_model=list[UnitOut])
-def list_units(_: CurrentUser = Depends(require("unit.manage")), db: Session = Depends(get_db)):
+def list_units(_: CurrentUser = Depends(require(*_CATALOG_READERS)), db: Session = Depends(get_db)):
     return db.scalars(select(Unit).order_by(Unit.name)).all()
 
 

@@ -1,12 +1,28 @@
+from pathlib import Path
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import get_settings
 from app.routers import admin, announcements, auth, dashboard, incidents, public
 
 API_PREFIX = "/api/v1"
+ADMIN_WEB_DIR = Path(__file__).parent / "admin_web"
+
+# پنل فقط فایل‌های خودش را بارگذاری می‌کند؛ اسکریپت و استایل درون‌خطی و قاب‌گرفتن صفحه مجاز نیست.
+ADMIN_SECURITY_HEADERS = {
+    "Content-Security-Policy": (
+        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+        "font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ),
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Cache-Control": "no-cache",
+}
 
 
 def create_app() -> FastAPI:
@@ -49,6 +65,20 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["health"])
     def health():
         return {"status": "ok"}
+
+    # پنل مدیریت وب: صفحه ایستا که فقط از همین API استفاده می‌کند. مجوزها همچنان در API بررسی می‌شوند.
+    @app.middleware("http")
+    async def admin_headers(request: Request, call_next):
+        response = await call_next(request)
+        if request.url.path == "/admin" or request.url.path.startswith("/admin/"):
+            response.headers.update(ADMIN_SECURITY_HEADERS)
+        return response
+
+    @app.get("/admin", include_in_schema=False)
+    def admin_root():
+        return RedirectResponse("/admin/")
+
+    app.mount("/admin", StaticFiles(directory=ADMIN_WEB_DIR, html=True), name="admin")
 
     return app
 

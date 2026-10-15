@@ -144,6 +144,17 @@ def create_announcement(
     return _out(a)
 
 
+@router.get("/admin/announcements", response_model=list[AnnouncementOut])
+def admin_announcements(
+    limit: int = Query(200, ge=1, le=500),
+    _: CurrentUser = Depends(require("announcement.manage")),
+    db: Session = Depends(get_db),
+):
+    """همه اطلاعیه‌ها (عمومی و داخلی، منتشرشده، زمان‌بندی‌شده و منقضی) برای پنل مدیریت."""
+    stmt = select(Announcement).order_by(Announcement.published_at.desc()).limit(limit)
+    return [_out(a) for a in db.scalars(stmt)]
+
+
 @router.delete("/admin/announcements/{announcement_id}", status_code=204)
 def expire_announcement(
     announcement_id: uuid.UUID,
