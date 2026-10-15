@@ -372,3 +372,71 @@ class ExamAttempt(Base):
     max_points: Mapped[float | None] = mapped_column(Float)
     score: Mapped[float | None] = mapped_column(Float)  # درصد
     passed: Mapped[bool | None] = mapped_column(Boolean)
+
+
+# ---------------------------------------------------------------- درخواست‌های پشتیبانی
+
+
+class RequestType(TimestampMixin, Base):
+    """نوع درخواست (مثلاً «خرابی پرینتر») با واحد مسئول پیش‌فرض و فیلدهای اختیاری."""
+
+    __tablename__ = "request_types"
+    id: Mapped[uuid.UUID] = pk()
+    name: Mapped[str] = mapped_column(String(200))
+    category: Mapped[str] = mapped_column(String(20))  # it | equipment | facilities | other
+    description: Mapped[str | None] = mapped_column(Text)
+    handler_unit_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("units.id"))
+    # [{"id","label","kind": text|number|select,"options": [...],"required": bool}]
+    fields: Mapped[list] = mapped_column(JSONB, default=list)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class ServiceRequest(TimestampMixin, Base):
+    __tablename__ = "service_requests"
+    id: Mapped[uuid.UUID] = pk()
+    tracking_code: Mapped[str] = mapped_column(String(20), unique=True, index=True)
+    client_uuid: Mapped[uuid.UUID] = mapped_column(unique=True)
+    type_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("request_types.id"), index=True)
+    requester_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    # واحد درخواست‌کننده هنگام ثبت (برای مسئول واحد و آمار)
+    requester_unit_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("units.id"), index=True)
+    # واحد پشتیبانی که الان مسئول است (با ارجاع عوض می‌شود)
+    handler_unit_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("units.id"), index=True)
+    assigned_to_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), index=True)
+    description: Mapped[str] = mapped_column(Text)
+    location: Mapped[str | None] = mapped_column(String(300))
+    answers: Mapped[dict] = mapped_column(JSONB, default=dict)
+    priority: Mapped[str] = mapped_column(
+        String(20), default="normal", index=True
+    )  # normal | urgent | critical
+    status: Mapped[str] = mapped_column(String(20), default="submitted", index=True)
+    resolution: Mapped[str | None] = mapped_column(Text)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    satisfaction: Mapped[int | None] = mapped_column(Integer)  # ۱ تا ۵
+    satisfaction_comment: Mapped[str | None] = mapped_column(Text)
+
+    events: Mapped[list["ServiceRequestEvent"]] = relationship(
+        order_by="ServiceRequestEvent.at", cascade="all, delete-orphan"
+    )
+
+
+class ServiceRequestEvent(Base):
+    """تاریخچه و گفتگوی درخواست: ثبت، تغییر وضعیت، ارجاع، یادداشت، پیوست، امتیاز."""
+
+    __tablename__ = "service_request_events"
+    id: Mapped[uuid.UUID] = pk()
+    request_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("service_requests.id", ondelete="CASCADE"), index=True
+    )
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    actor_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    kind: Mapped[str] = mapped_column(String(20))
+    from_status: Mapped[str | None] = mapped_column(String(20))
+    to_status: Mapped[str | None] = mapped_column(String(20))
+    note: Mapped[str | None] = mapped_column(Text)
+    media_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("media_files.id"))
+
+    media: Mapped[MediaFile | None] = relationship(lazy="joined")
