@@ -49,6 +49,7 @@ fun RaziScaffold(
     title: String,
     onBack: (() -> Unit)? = null,
     actions: @Composable () -> Unit = {},
+    floatingActionButton: @Composable () -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
     Scaffold(
@@ -71,6 +72,7 @@ fun RaziScaffold(
                 ),
             )
         },
+        floatingActionButton = floatingActionButton,
         content = content,
     )
 }
