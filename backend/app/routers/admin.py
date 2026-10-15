@@ -31,6 +31,7 @@ def _user_out(u: User) -> UserOut:
         full_name=u.full_name,
         mobile=u.mobile,
         unit_id=u.unit_id,
+        job_title=u.job_title,
         is_active=u.is_active,
         must_change_password=u.must_change_password,
         roles=[RoleAssignment(role=r.role.code, unit_id=r.unit_id) for r in u.roles],
@@ -57,7 +58,7 @@ def _set_roles(db: Session, user: User, roles: list[RoleAssignment]) -> None:
 
 
 # فهرست نقش‌ها و واحدها برای فرم‌های پنل (انتساب نقش، هدف‌گذاری اطلاعیه، نمایش نام واحد) هم لازم است.
-_CATALOG_READERS = ("user.manage", "unit.manage", "announcement.manage", "feedback.manage")
+_CATALOG_READERS = ("user.manage", "unit.manage", "announcement.manage", "feedback.manage", "training.manage")
 
 
 @router.get("/roles", response_model=list[RoleOut])
@@ -92,6 +93,7 @@ def create_user(
         full_name=body.full_name.strip(),
         mobile=body.mobile,
         unit_id=body.unit_id,
+        job_title=(body.job_title or "").strip() or None,
         password_hash=hash_password(body.temporary_password),
         must_change_password=True,
     )
@@ -121,6 +123,8 @@ def update_user(
     if user is None:
         raise api_error(404, "not_found", "کاربر پیدا نشد")
     changes = body.model_dump(exclude_unset=True, exclude={"roles"})
+    if "job_title" in changes:
+        changes["job_title"] = (changes["job_title"] or "").strip() or None
     for k, v in changes.items():
         setattr(user, k, v)
     if body.roles is not None:

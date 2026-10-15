@@ -153,6 +153,7 @@ def me(cu: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db
         full_name=u.full_name,
         unit_id=u.unit_id,
         unit_name=unit.name if unit else None,
+        job_title=u.job_title,
         roles=sorted(cu.role_codes),
         permissions=cu.all_permissions,
         must_change_password=u.must_change_password,

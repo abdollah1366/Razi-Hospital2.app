@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     bootstrap_admin_password: str | None = None
     # فقط برای env=staging: رمز کاربران نمایشی (به جای رمز پیش‌فرض عمومی)
     demo_password: str | None = None
+    # فایل‌های آموزشی؛ مسیر نسبی نسبت به پوشه اجرای سرور (backend)
+    media_dir: str = "media"
+    max_upload_mb: int = 500
 
     @property
     def is_exposed(self) -> bool:

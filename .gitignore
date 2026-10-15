@@ -27,3 +27,5 @@ venv/
 
 # server logs
 backend/logs/
+# uploaded training files
+backend/media/
