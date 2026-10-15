@@ -5,7 +5,7 @@
 
 ## ۱. نصب پیش‌نیازها (یک بار)
 
-- **Python 3.12** از python.org (دقیقاً 3.12؛ با 3.14 بسته psycopg نصب نمی‌شود). اگر نسخه دیگری هم نصب است اشکالی ندارد؛ در مرحله ۲ با `py -3.12` انتخاب می‌شود.
+- **Python 3.11 یا 3.12** از python.org (با 3.14 بسته psycopg نصب نمی‌شود). اگر نسخه دیگری هم نصب است اشکالی ندارد؛ در مرحله ۲ با `py -3.11` یا `py -3.12` انتخاب می‌شود (فهرست نسخه‌ها: `py -0`).
 - **PostgreSQL 16** از سایت EDB (نصب‌کننده ویندوز). برای کاربر `postgres` یک رمز بگذارید و یادداشت کنید. Stack Builder لازم نیست.
 - کد پروژه: در صفحه GitHub مخزن، Code ← Download ZIP، و آن را در `C:\razi` باز کنید (طوری که `C:\razi\backend` وجود داشته باشد).
 
@@ -15,7 +15,7 @@
 
 ```powershell
 cd C:\razi\backend
-py -3.12 -m venv .venv
+py -3.11 -m venv .venv
 .venv\Scripts\python -m pip install .
 .venv\Scripts\python scripts\make_staging_env.py
 ```
