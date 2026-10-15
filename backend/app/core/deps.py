@@ -80,9 +80,11 @@ def get_active_user(cu: CurrentUser = Depends(get_current_user)) -> CurrentUser:
     return cu
 
 
-def require(permission: str):
+def require(*permissions: str):
+    """کاربر باید دست‌کم یکی از مجوزهای داده‌شده را داشته باشد."""
+
     def checker(cu: CurrentUser = Depends(get_active_user)) -> CurrentUser:
-        if not cu.has(permission):
+        if not any(cu.has(p) for p in permissions):
             raise api_error(status.HTTP_403_FORBIDDEN, "forbidden", "به این بخش دسترسی ندارید")
         return cu
 
