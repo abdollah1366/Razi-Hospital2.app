@@ -44,6 +44,9 @@ class DefaultAuthRepository(
     private suspend fun cachedMe(): MeDto? =
         cache.get(KEY_ME)?.let { runCatching { AppJson.decodeFromString(MeDto.serializer(), it) }.getOrNull() }
 
+    /** آیا توکن ورود روی گوشی هست؛ کارهای پس‌زمینه بدون آن به سرور درخواست نمی‌فرستند. */
+    val hasSession: Boolean get() = tokens.refreshToken != null
+
     private val _session = MutableStateFlow<SessionState>(SessionState.Unknown)
     override val session: StateFlow<SessionState> = _session.asStateFlow()
 
