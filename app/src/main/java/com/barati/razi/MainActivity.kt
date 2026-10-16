@@ -12,6 +12,7 @@ import com.barati.razi.core.data.SessionState
 import com.barati.razi.notify.SystemNotifier
 import com.barati.razi.ui.navigation.RaziNavHost
 import com.barati.razi.ui.theme.RaziTheme
+import com.barati.razi.work.ChatSendWorker
 import com.barati.razi.work.IncidentUploadWorker
 import com.barati.razi.work.NotificationWorker
 import com.barati.razi.work.RequestUploadWorker
@@ -36,12 +37,17 @@ class MainActivity : ComponentActivity() {
                     is SessionState.LoggedIn -> {
                         SystemNotifier.ensureChannels(applicationContext)
                         NotificationWorker.schedule(applicationContext)
+                        // پیام‌های گفتگو که پیش از بسته شدن اپ در صف ماندند
+                        ChatSendWorker.schedule(applicationContext)
                     }
                     is SessionState.LoggedOut -> {
                         // اعلان‌های کاربر قبلی روی گوشی نمی‌مانند و دریافت دوره‌ای متوقف می‌شود.
                         NotificationWorker.cancel(applicationContext)
                         SystemNotifier.cancelAll(applicationContext)
                         container.notificationRepository.clear()
+                        // صف پیام‌های کاربر قبلی نباید با حساب بعدی فرستاده شود
+                        ChatSendWorker.cancel(applicationContext)
+                        container.chatRepository.clear()
                     }
                     SessionState.Unknown -> Unit
                 }

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.FactCheck
+import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Public
@@ -64,6 +65,7 @@ fun StaffHomeScreen(
     onTraining: () -> Unit,
     onRequests: () -> Unit,
     onNotifications: () -> Unit,
+    onChat: () -> Unit,
     onPublic: () -> Unit,
     onLogout: () -> Unit,
 ) {
@@ -72,8 +74,11 @@ fun StaffHomeScreen(
     val pending by container.incidentRepository.pending.collectAsState(initial = emptyList())
     val pendingRequests by container.serviceRequestRepository.pending.collectAsState(initial = emptyList())
     val unread by container.notificationRepository.unread.collectAsState()
+    val chatUnread by container.chatRepository.unread.collectAsState()
+    val chatPending by container.chatRepository.pending.collectAsState(initial = emptyList())
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         container.scope.launch { container.notificationRepository.refreshUnread() }
+        container.scope.launch { container.chatRepository.refreshUnread() }
     }
     NotificationPermissionPrompt(container)
     LaunchedEffect(me.id) {
@@ -146,9 +151,20 @@ fun StaffHomeScreen(
                     onRequests,
                 )
             }
+            MenuTile(
+                "گفتگو",
+                when {
+                    chatPending.isNotEmpty() -> toPersianDigits("${chatPending.size} پیام در انتظار ارسال")
+                    chatUnread > 0 -> "پیام‌های تازه همکاران"
+                    else -> "پیام به همکاران، گروه‌ها و کانال واحد"
+                },
+                Icons.Filled.Forum,
+                onChat,
+                badge = chatUnread,
+            )
             MenuTile("خدمات عمومی بیمارستان", "راهنمای بخش‌ها، پرسش‌ها و شکایات", Icons.Filled.Public, onPublic)
             Text(
-                "بخش‌های پژوهش و گفتگو در مراحل بعدی اضافه می‌شوند.",
+                "بخش پژوهش در مراحل بعدی اضافه می‌شود.",
                 style = MaterialTheme.typography.bodySmall,
             )
         }

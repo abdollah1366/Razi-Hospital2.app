@@ -2,4 +2,5 @@
 <paths>
     <cache-path name="training" path="training/" />
     <cache-path name="requests" path="requests/" />
+    <cache-path name="chat" path="chat/" />
 </paths>

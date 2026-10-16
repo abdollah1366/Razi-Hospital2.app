@@ -3,6 +3,7 @@ package com.barati.razi.core.network
 import kotlinx.serialization.json.JsonObject
 import okhttp3.RequestBody
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
@@ -179,4 +180,63 @@ interface ApiService {
 
     @POST("notifications/read-all")
     suspend fun markAllNotificationsRead()
+
+    @GET("chat/conversations")
+    suspend fun chatConversations(): ConversationListDto
+
+    @GET("chat/unread-count")
+    suspend fun chatUnread(): ChatUnreadDto
+
+    @GET("chat/people")
+    suspend fun chatPeople(@Query("q") q: String): List<ChatPersonDto>
+
+    @POST("chat/direct")
+    suspend fun openDirect(@Body body: DirectBody): ConversationDto
+
+    @POST("chat/groups")
+    suspend fun createGroup(@Body body: GroupBody): ConversationDto
+
+    @GET("chat/conversations/{id}")
+    suspend fun conversation(@Path("id") id: String): ConversationDto
+
+    @PATCH("chat/conversations/{id}")
+    suspend fun renameGroup(@Path("id") id: String, @Body body: GroupTitleBody): ConversationDto
+
+    @POST("chat/conversations/{id}/members")
+    suspend fun addMembers(@Path("id") id: String, @Body body: MembersBody): ConversationDto
+
+    @DELETE("chat/conversations/{id}/members/{userId}")
+    suspend fun removeMember(@Path("id") id: String, @Path("userId") userId: String)
+
+    @POST("chat/conversations/{id}/mute")
+    suspend fun muteConversation(@Path("id") id: String, @Body body: MuteBody)
+
+    @GET("chat/conversations/{id}/messages")
+    suspend fun chatMessages(
+        @Path("id") id: String,
+        @Query("before") before: String? = null,
+        @Query("since") since: String? = null,
+        @Query("limit") limit: Int = 50,
+    ): ChatMessagePageDto
+
+    @POST("chat/conversations/{id}/messages")
+    suspend fun sendChatMessage(@Path("id") id: String, @Body body: ChatMessageBody): ChatMessageDto
+
+    @POST("chat/conversations/{id}/attachments")
+    suspend fun sendChatAttachment(
+        @Path("id") id: String,
+        @Query("filename") filename: String,
+        @Query("client_uuid") clientUuid: String,
+        @Query("reply_to_id") replyToId: String?,
+        @Body body: RequestBody,
+    ): ChatMessageDto
+
+    @PATCH("chat/conversations/{id}/messages/{messageId}")
+    suspend fun editChatMessage(@Path("id") id: String, @Path("messageId") messageId: String, @Body body: ChatEditBody): ChatMessageDto
+
+    @DELETE("chat/conversations/{id}/messages/{messageId}")
+    suspend fun deleteChatMessage(@Path("id") id: String, @Path("messageId") messageId: String)
+
+    @POST("chat/conversations/{id}/read")
+    suspend fun markChatRead(@Path("id") id: String)
 }
