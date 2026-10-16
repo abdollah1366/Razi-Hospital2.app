@@ -11,6 +11,7 @@ from app.routers import (
     admin,
     announcements,
     auth,
+    chat,
     dashboard,
     incidents,
     notifications,
@@ -72,6 +73,7 @@ def create_app() -> FastAPI:
         training.router,
         requests.router,
         notifications.router,
+        chat.router,
     ):
         app.include_router(r, prefix=API_PREFIX)
 

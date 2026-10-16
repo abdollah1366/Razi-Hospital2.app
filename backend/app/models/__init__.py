@@ -463,3 +463,62 @@ class Notification(Base):
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (Index("ix_notifications_user_created", "user_id", "created_at"),)
+
+
+# ---------------------------------------------------------------- گفتگوی داخلی
+
+
+class ChatConversation(Base):
+    """گفتگوی دونفره (direct)، گروه (group) یا کانال خودکار یک واحد (unit)."""
+
+    __tablename__ = "chat_conversations"
+    id: Mapped[uuid.UUID] = pk()
+    kind: Mapped[str] = mapped_column(String(10))  # direct | group | unit
+    title: Mapped[str | None] = mapped_column(String(200))  # فقط گروه
+    unit_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("units.id", ondelete="CASCADE"), unique=True)
+    # شناسه دو طرف به ترتیب؛ از ساخته شدن دو گفتگوی دونفره میان دو نفر جلوگیری می‌کند.
+    direct_key: Mapped[str | None] = mapped_column(String(80), unique=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class ChatMember(Base):
+    __tablename__ = "chat_members"
+    __table_args__ = (UniqueConstraint("conversation_id", "user_id"),)
+    id: Mapped[uuid.UUID] = pk()
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("chat_conversations.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False)  # مدیر گروه
+    muted: Mapped[bool] = mapped_column(Boolean, default=False)
+    joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ChatMessage(Base):
+    """متن پیام فقط برای اعضای گفتگو برگردانده می‌شود و در هیچ لاگی نوشته نمی‌شود."""
+
+    __tablename__ = "chat_messages"
+    __table_args__ = (
+        Index("ix_chat_messages_conv_created", "conversation_id", "created_at"),
+        Index("ix_chat_messages_conv_updated", "conversation_id", "updated_at"),
+    )
+    id: Mapped[uuid.UUID] = pk()
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("chat_conversations.id", ondelete="CASCADE")
+    )
+    sender_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    # شناسه‌ای که اپ می‌سازد تا ارسال دوباره از صف آفلاین پیام تکراری نسازد.
+    client_uuid: Mapped[uuid.UUID] = mapped_column(unique=True)
+    body: Mapped[str | None] = mapped_column(Text)
+    media_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("media_files.id"))
+    reply_to_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("chat_messages.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # با هر ویرایش یا حذف جلو می‌رود تا اپ تغییرها را هم با پرسش دوره‌ای بگیرد.
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    media: Mapped[MediaFile | None] = relationship(lazy="joined")
