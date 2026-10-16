@@ -25,6 +25,9 @@ PERMISSIONS: dict[str, str] = {
     "request.handle": "رسیدگی به درخواست‌های پشتیبانی واحد",
     "request.read": "مشاهده درخواست‌های پشتیبانی کارکنان واحد و آمار آن",
     "request.type.manage": "تعریف انواع درخواست و واحد مسئول",
+    # خود گفتگو برای همه کاربران فعال است؛ این دو فقط ساخت گروه و نوشتن در کانال واحد را باز می‌کنند.
+    "chat.group.create": "ساخت گروه گفتگو",
+    "chat.unit.post": "نوشتن در کانال گفتگوی واحد",
 }
 
 DEFAULT_ROLES: dict[str, tuple[str, list[str]]] = {
@@ -38,6 +41,8 @@ DEFAULT_ROLES: dict[str, tuple[str, list[str]]] = {
             "training.read",
             "request.create",
             "request.read",
+            "chat.group.create",
+            "chat.unit.post",
         ],
     ),
     "patient_safety": (
@@ -82,6 +87,13 @@ DEFAULT_ROLES: dict[str, tuple[str, list[str]]] = {
     # مدیر سیستم عمداً به محتوای گزارش‌های خطا دسترسی ندارد.
     "sysadmin": (
         "مدیر سیستم",
-        ["user.manage", "unit.manage", "form.manage", "announcement.read", "request.type.manage"],
+        [
+            "user.manage",
+            "unit.manage",
+            "form.manage",
+            "announcement.read",
+            "request.type.manage",
+            "chat.group.create",
+        ],
     ),
 }

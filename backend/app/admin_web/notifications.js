@@ -16,6 +16,7 @@ const NOTIF_LINKS = {
   announcement: ["bell", "teal", () => null],
   course: ["school", "green", (id) => (can("training.manage") ? "#/courses/" + id : null)],
   exam: ["quiz", "amber", (id) => (can("training.manage") ? "#/exams/" + id : null)],
+  chat: ["chat", "teal", () => null],
 };
 
 const notif = { count: 0, important: 0, timer: null, panel: null, badges: new Set() };

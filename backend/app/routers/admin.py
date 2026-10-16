@@ -20,6 +20,7 @@ from app.schemas import (
     UserOut,
     UserUpdateIn,
 )
+from app.services import chat
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -129,6 +130,9 @@ def update_user(
         setattr(user, k, v)
     if body.roles is not None:
         _set_roles(db, user, body.roles)
+    db.flush()
+    # غیرفعال شدن، تغییر واحد یا نقش: عضویت در گفتگوها و کانال‌های واحد همان لحظه به‌روز می‌شود
+    chat.sync_user(db, user)
     audit(
         db,
         "user.updated",
