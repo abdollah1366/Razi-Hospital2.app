@@ -17,4 +17,5 @@ object Keys {
     const val PENDING_REQUESTS = "pending_service_requests"
     const val SHOWN_NOTIFICATIONS = "shown_notifications"
     const val NOTIFICATION_PERMISSION_ASKED = "notification_permission_asked"
+    const val CHAT_OUTBOX = "chat_outbox"
 }

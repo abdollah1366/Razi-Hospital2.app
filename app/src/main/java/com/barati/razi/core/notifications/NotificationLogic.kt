@@ -10,6 +10,7 @@ sealed interface NotificationTarget {
     data class Request(val id: String) : NotificationTarget
     data class Incident(val id: String) : NotificationTarget
     data class Course(val id: String) : NotificationTarget
+    data class Chat(val id: String) : NotificationTarget
     data object Announcements : NotificationTarget
     data object Training : NotificationTarget
 }
@@ -27,6 +28,7 @@ object NotificationLogic {
         "incident" -> linkId?.let { NotificationTarget.Incident(it) }
         "course" -> linkId?.let { NotificationTarget.Course(it) }
         "announcement" -> NotificationTarget.Announcements
+        "chat" -> linkId?.let { NotificationTarget.Chat(it) }
         // آزمون از صفحه آموزش شروع می‌شود تا کاربر پیش از شروع، زمان و شرایط را ببیند.
         "exam" -> NotificationTarget.Training
         else -> null
