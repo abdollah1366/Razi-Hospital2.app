@@ -9,6 +9,7 @@ import com.barati.razi.core.data.DefaultAuthRepository
 import com.barati.razi.core.data.IncidentRepository
 import com.barati.razi.core.data.Keys
 import com.barati.razi.core.data.NotificationRepository
+import com.barati.razi.core.data.ScheduleRepository
 import com.barati.razi.core.data.ServiceRequestRepository
 import com.barati.razi.core.data.TrainingRepository
 import com.barati.razi.core.network.HttpFactory
@@ -53,6 +54,7 @@ class AppContainer(context: Context) {
 
     val serviceRequestRepository = ServiceRequestRepository(api, store)
     val notificationRepository = NotificationRepository(api, store)
+    val scheduleRepository = ScheduleRepository(api, store)
     val chatRepository = ChatRepository(api, store, java.io.File(appContext.filesDir, "chat-outbox"))
 
     /** مقصدی که با لمس اعلان سیستمی باید باز شود؛ صفحه‌ها پس از آماده شدن نشست آن را مصرف می‌کنند. */

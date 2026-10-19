@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BatterySaver
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Forum
@@ -82,6 +83,7 @@ private fun styleOf(linkType: String?): NotifStyle = when (linkType) {
     "announcement" -> NotifStyle(Icons.Filled.Campaign, Tone(TrainingColors.amber, TrainingColors.amberBg))
     "course" -> NotifStyle(Icons.Filled.School, Tone(TrainingColors.green, TrainingColors.greenBg))
     "exam" -> NotifStyle(Icons.Filled.Quiz, Tone(TrainingColors.amber, TrainingColors.amberBg))
+    "schedule" -> NotifStyle(Icons.Filled.CalendarMonth, Tone(TrainingColors.amber, TrainingColors.amberBg))
     "chat" -> NotifStyle(Icons.Filled.Forum, Tone(TrainingColors.blue, TrainingColors.blueBg))
     else -> NotifStyle(Icons.Filled.Notifications, Tone(TrainingColors.gray, TrainingColors.grayBg))
 }

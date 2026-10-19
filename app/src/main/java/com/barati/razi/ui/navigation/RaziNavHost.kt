@@ -45,6 +45,11 @@ import com.barati.razi.feature.training.AttemptScreen
 import com.barati.razi.feature.training.CourseItemScreen
 import com.barati.razi.feature.training.CourseScreen
 import com.barati.razi.feature.training.ExamTakeScreen
+import com.barati.razi.feature.schedule.MyScheduleScreen
+import com.barati.razi.feature.schedule.OnDutyScreen
+import com.barati.razi.feature.schedule.ScheduleRosterScreen
+import com.barati.razi.feature.schedule.ScheduleSwapsScreen
+import com.barati.razi.feature.schedule.ScheduleUnitsScreen
 import com.barati.razi.feature.training.TrainingHomeScreen
 import com.barati.razi.ui.components.LoadingBox
 import kotlinx.coroutines.launch
@@ -79,12 +84,18 @@ object Routes {
     const val CHAT_GROUP_NEW = "chat_group_new"
     const val CHAT = "chat/{id}"
     const val CHAT_INFO = "chat/{id}/info"
+    const val SCHEDULE = "schedule"
+    const val SCHEDULE_UNITS = "schedule_units"
+    const val SCHEDULE_ROSTER = "schedule/{id}"
+    const val SCHEDULE_SWAPS = "schedule_swaps"
+    const val ON_DUTY = "on_duty"
 
     /** صفحه‌هایی که بدون نشست معتبر باز نمی‌مانند. */
     val staffOnly = setOf(
         CHANGE_PASSWORD, STAFF_HOME, MY_INCIDENTS, INCIDENT_DETAIL, ANNOUNCEMENTS, REVIEW,
         TRAINING, COURSE, COURSE_ITEM, EXAM_TAKE, ATTEMPT, REQUESTS, REQUEST_DETAIL, NOTIFICATIONS,
         CHATS, CHAT_NEW, CHAT_GROUP_NEW, CHAT, CHAT_INFO,
+        SCHEDULE, SCHEDULE_UNITS, SCHEDULE_ROSTER, SCHEDULE_SWAPS, ON_DUTY,
     )
 
     fun track(code: String = "", secret: String = "") = "track?code=${Uri.encode(code)}&secret=${Uri.encode(secret)}"
@@ -96,6 +107,7 @@ object Routes {
     fun request(id: String) = "request/$id"
     fun chat(id: String) = "chat/$id"
     fun chatInfo(id: String) = "chat/$id/info"
+    fun scheduleRoster(id: String) = "schedule/$id"
 
     fun of(target: NotificationTarget): String = when (target) {
         is NotificationTarget.Request -> request(target.id)
@@ -104,6 +116,7 @@ object Routes {
         NotificationTarget.Announcements -> ANNOUNCEMENTS
         NotificationTarget.Training -> TRAINING
         is NotificationTarget.Chat -> chat(target.id)
+        is NotificationTarget.Schedule -> target.id?.let(::scheduleRoster) ?: SCHEDULE
     }
 }
 
@@ -207,6 +220,7 @@ fun RaziNavHost(container: AppContainer, nav: NavHostController = rememberNavCon
                     onRequests = { nav.navigate(Routes.REQUESTS) },
                     onNotifications = { nav.navigate(Routes.NOTIFICATIONS) },
                     onChat = { nav.navigate(Routes.CHATS) },
+                    onSchedule = { nav.navigate(Routes.SCHEDULE) },
                     onPublic = { nav.popBackStack(Routes.PUBLIC_HOME, inclusive = false) },
                     onLogout = { scope.launch { container.authRepository.logout() } },
                 )
@@ -299,6 +313,34 @@ fun RaziNavHost(container: AppContainer, nav: NavHostController = rememberNavCon
         composable(Routes.NOTIFICATIONS) {
             NotificationsScreen(container, onBack = back, onOpen = { nav.navigate(Routes.of(it)) })
         }
+        composable(Routes.SCHEDULE) {
+            val s = session
+            if (s is SessionState.LoggedIn) {
+                MyScheduleScreen(
+                    container,
+                    s.me,
+                    onBack = back,
+                    onUnits = { nav.navigate(Routes.SCHEDULE_UNITS) },
+                    onOnDuty = { nav.navigate(Routes.ON_DUTY) },
+                    onSwaps = { nav.navigate(Routes.SCHEDULE_SWAPS) },
+                )
+            } else {
+                LoadingBox()
+            }
+        }
+        composable(Routes.SCHEDULE_UNITS) {
+            ScheduleUnitsScreen(container, onBack = back, onOpen = { nav.navigate(Routes.scheduleRoster(it)) })
+        }
+        composable(Routes.SCHEDULE_ROSTER, arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
+            val s = session
+            if (s is SessionState.LoggedIn) {
+                ScheduleRosterScreen(container, s.me, entry.arguments?.getString("id").orEmpty(), back)
+            } else {
+                LoadingBox()
+            }
+        }
+        composable(Routes.SCHEDULE_SWAPS) { ScheduleSwapsScreen(container, back) }
+        composable(Routes.ON_DUTY) { OnDutyScreen(container, back) }
         composable(Routes.CHATS) {
             ChatListScreen(container, onBack = back, onOpen = { nav.navigate(Routes.chat(it)) }, onNew = { nav.navigate(Routes.CHAT_NEW) })
         }

@@ -239,4 +239,31 @@ interface ApiService {
 
     @POST("chat/conversations/{id}/read")
     suspend fun markChatRead(@Path("id") id: String)
+
+    @GET("schedules/mine")
+    suspend fun mySchedule(@Query("start") start: String? = null, @Query("end") end: String? = null): MyScheduleDto
+
+    @GET("schedules")
+    suspend fun scheduleUnits(@Query("jyear") jyear: Int, @Query("jmonth") jmonth: Int): List<UnitScheduleRowDto>
+
+    @GET("schedules/{id}")
+    suspend fun scheduleDetail(@Path("id") id: String): ScheduleDetailDto
+
+    @POST("schedules/{id}/approve")
+    suspend fun approveSchedule(@Path("id") id: String): ScheduleDetailDto
+
+    @POST("schedules/{id}/return")
+    suspend fun returnSchedule(@Path("id") id: String, @Body body: ReturnBody): ScheduleDetailDto
+
+    @GET("schedules/on-duty")
+    suspend fun onDuty(@Query("day") day: String? = null): OnDutyDto
+
+    @GET("schedules/swaps")
+    suspend fun swaps(): List<SwapDto>
+
+    @POST("schedules/swaps")
+    suspend fun createSwap(@Body body: SwapBody): SwapDto
+
+    @POST("schedules/swaps/{id}/{action}")
+    suspend fun answerSwap(@Path("id") id: String, @Path("action") action: String, @Body body: SwapAnswerBody): SwapDto
 }
