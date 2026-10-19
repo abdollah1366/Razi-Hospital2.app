@@ -2,6 +2,7 @@ package com.barati.razi
 
 import android.content.Context
 import android.os.Build
+import com.barati.razi.core.data.ChatRepository
 import com.barati.razi.core.data.ContentRepository
 import com.barati.razi.core.data.DataStoreKeyValueStore
 import com.barati.razi.core.data.DefaultAuthRepository
@@ -52,6 +53,7 @@ class AppContainer(context: Context) {
 
     val serviceRequestRepository = ServiceRequestRepository(api, store)
     val notificationRepository = NotificationRepository(api, store)
+    val chatRepository = ChatRepository(api, store, java.io.File(appContext.filesDir, "chat-outbox"))
 
     /** مقصدی که با لمس اعلان سیستمی باید باز شود؛ صفحه‌ها پس از آماده شدن نشست آن را مصرف می‌کنند. */
     val pendingOpen = MutableStateFlow<OpenRequest?>(null)

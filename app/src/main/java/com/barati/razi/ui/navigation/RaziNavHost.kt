@@ -15,10 +15,16 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.barati.razi.AppContainer
 import com.barati.razi.core.data.SessionState
+import com.barati.razi.core.data.can
 import com.barati.razi.core.notifications.NotificationLogic
 import com.barati.razi.core.notifications.NotificationTarget
 import com.barati.razi.feature.announcements.AnnouncementsScreen
 import com.barati.razi.feature.auth.ChangePasswordScreen
+import com.barati.razi.feature.chat.ChatInfoScreen
+import com.barati.razi.feature.chat.ChatListScreen
+import com.barati.razi.feature.chat.ChatScreen
+import com.barati.razi.feature.chat.NewChatScreen
+import com.barati.razi.feature.chat.NewGroupScreen
 import com.barati.razi.feature.auth.LoginScreen
 import com.barati.razi.feature.home.StaffHomeScreen
 import com.barati.razi.feature.incident.IncidentDetailScreen
@@ -68,11 +74,17 @@ object Routes {
     const val REQUEST_NEW = "request_new"
     const val REQUEST_DETAIL = "request/{id}"
     const val NOTIFICATIONS = "notifications"
+    const val CHATS = "chats"
+    const val CHAT_NEW = "chat_new"
+    const val CHAT_GROUP_NEW = "chat_group_new"
+    const val CHAT = "chat/{id}"
+    const val CHAT_INFO = "chat/{id}/info"
 
     /** صفحه‌هایی که بدون نشست معتبر باز نمی‌مانند. */
     val staffOnly = setOf(
         CHANGE_PASSWORD, STAFF_HOME, MY_INCIDENTS, INCIDENT_DETAIL, ANNOUNCEMENTS, REVIEW,
         TRAINING, COURSE, COURSE_ITEM, EXAM_TAKE, ATTEMPT, REQUESTS, REQUEST_DETAIL, NOTIFICATIONS,
+        CHATS, CHAT_NEW, CHAT_GROUP_NEW, CHAT, CHAT_INFO,
     )
 
     fun track(code: String = "", secret: String = "") = "track?code=${Uri.encode(code)}&secret=${Uri.encode(secret)}"
@@ -82,6 +94,8 @@ object Routes {
     fun examTake(id: String) = "exam/$id/take"
     fun attempt(id: String) = "attempt/$id"
     fun request(id: String) = "request/$id"
+    fun chat(id: String) = "chat/$id"
+    fun chatInfo(id: String) = "chat/$id/info"
 
     fun of(target: NotificationTarget): String = when (target) {
         is NotificationTarget.Request -> request(target.id)
@@ -89,6 +103,7 @@ object Routes {
         is NotificationTarget.Course -> course(target.id)
         NotificationTarget.Announcements -> ANNOUNCEMENTS
         NotificationTarget.Training -> TRAINING
+        is NotificationTarget.Chat -> chat(target.id)
     }
 }
 
@@ -191,6 +206,7 @@ fun RaziNavHost(container: AppContainer, nav: NavHostController = rememberNavCon
                     onTraining = { nav.navigate(Routes.TRAINING) },
                     onRequests = { nav.navigate(Routes.REQUESTS) },
                     onNotifications = { nav.navigate(Routes.NOTIFICATIONS) },
+                    onChat = { nav.navigate(Routes.CHATS) },
                     onPublic = { nav.popBackStack(Routes.PUBLIC_HOME, inclusive = false) },
                     onLogout = { scope.launch { container.authRepository.logout() } },
                 )
@@ -282,6 +298,51 @@ fun RaziNavHost(container: AppContainer, nav: NavHostController = rememberNavCon
         }
         composable(Routes.NOTIFICATIONS) {
             NotificationsScreen(container, onBack = back, onOpen = { nav.navigate(Routes.of(it)) })
+        }
+        composable(Routes.CHATS) {
+            ChatListScreen(container, onBack = back, onOpen = { nav.navigate(Routes.chat(it)) }, onNew = { nav.navigate(Routes.CHAT_NEW) })
+        }
+        composable(Routes.CHAT_NEW) {
+            val s = session
+            NewChatScreen(
+                container,
+                canCreateGroup = s is SessionState.LoggedIn && s.me.can("chat.group.create"),
+                onBack = back,
+                onOpened = { nav.navigate(Routes.chat(it)) { popUpTo(Routes.CHAT_NEW) { inclusive = true } } },
+                onNewGroup = { nav.navigate(Routes.CHAT_GROUP_NEW) { popUpTo(Routes.CHAT_NEW) { inclusive = true } } },
+            )
+        }
+        composable(Routes.CHAT_GROUP_NEW) {
+            NewGroupScreen(
+                container,
+                onBack = back,
+                onCreated = { nav.navigate(Routes.chat(it)) { popUpTo(Routes.CHAT_GROUP_NEW) { inclusive = true } } },
+            )
+        }
+        composable(Routes.CHAT, arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
+            val s = session
+            val id = entry.arguments?.getString("id").orEmpty()
+            if (s is SessionState.LoggedIn) {
+                ChatScreen(container, s.me.id, id, onBack = back, onInfo = { nav.navigate(Routes.chatInfo(id)) })
+            } else {
+                LoadingBox()
+            }
+        }
+        composable(Routes.CHAT_INFO, arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
+            val s = session
+            if (s is SessionState.LoggedIn) {
+                ChatInfoScreen(
+                    container,
+                    s.me.id,
+                    entry.arguments?.getString("id").orEmpty(),
+                    onBack = back,
+                    // پس از خروج از گروه، صفحه گروه هم بسته می‌شود
+                    onLeft = { nav.popBackStack(Routes.CHATS, inclusive = false) },
+                    onOpenChat = { nav.navigate(Routes.chat(it)) },
+                )
+            } else {
+                LoadingBox()
+            }
         }
         composable(Routes.ATTEMPT, arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
             AttemptScreen(container, entry.arguments?.getString("id").orEmpty(), back)
