@@ -1,7 +1,7 @@
 """داده‌های پایه: نقش‌ها، قالب فرم گزارش خطا و (اختیاری) مدیر اولیه و داده نمایشی.
 
 اجرا:
-    python -m app.seed            # نقش‌ها و فرم؛ مدیر اولیه از RAZI_BOOTSTRAP_ADMIN_CODE/PASSWORD
+    python -m app.seed            # نقش‌ها، فرم و کدهای شیفت؛ مدیر اولیه از RAZI_BOOTSTRAP_ADMIN_CODE/PASSWORD
     python -m app.seed --demo     # به‌علاوه واحدها و کاربران نمایشی (توسعه، یا staging با RAZI_DEMO_PASSWORD)
 """
 
@@ -16,9 +16,20 @@ from app.core.config import get_settings
 from app.core.db import SessionLocal
 from app.core.permissions import DEFAULT_ROLES
 from app.core.security import hash_password
-from app.models import Announcement, Faq, FormTemplate, RequestType, Role, Unit, User, UserRole
+from app.models import (
+    Announcement,
+    Faq,
+    FormTemplate,
+    RequestType,
+    Role,
+    ShiftType,
+    Unit,
+    User,
+    UserRole,
+)
 
 INCIDENT_FORM = Path(__file__).parent / "data" / "incident_form.json"
+SHIFT_CODES = Path(__file__).parent / "data" / "shift_codes.json"
 DEMO_PASSWORD = "Razi1234"
 
 
@@ -36,6 +47,31 @@ def seed_forms(db: Session) -> None:
     if db.scalar(select(FormTemplate).where(FormTemplate.code == "incident")) is None:
         schema = json.loads(INCIDENT_FORM.read_text(encoding="utf-8"))
         db.add(FormTemplate(code="incident", version=schema.get("version", 1), schema=schema, is_active=True))
+
+
+def seed_shift_types(db: Session) -> None:
+    """کدهای شیفت فهرست رسمی بیمارستان؛ فقط کدهای تازه افزوده می‌شوند تا ویرایش‌های پنل از بین نروند."""
+    existing = set(db.scalars(select(ShiftType.code)))
+    for c in json.loads(SHIFT_CODES.read_text(encoding="utf-8"))["codes"]:
+        if c["code"] in existing:
+            continue
+        db.add(
+            ShiftType(
+                code=c["code"],
+                title=c["title"],
+                label=c["label"],
+                kind=c["kind"],
+                group=c["group"],
+                segments=c["segments"],
+                hours=c["hours"],
+                productivity=c["productivity"],
+                overtime=c["overtime"],
+                weekday=c["weekday"],
+                is_active=c["active"],
+                replaced_by=c["replaced_by"],
+                review_note=c["review_note"],
+            )
+        )
 
 
 def _user(
@@ -86,6 +122,7 @@ def seed_demo(db: Session) -> None:
         # پایگاه داده قبلاً داده نمایشی دارد؛ فقط موارد تازه (مثل بخش آموزش) افزوده می‌شوند.
         seed_demo_training(db, password)
         seed_demo_requests(db, password)
+        seed_demo_schedules(db, password)
         return
     units = {
         "emergency": Unit(
@@ -132,6 +169,7 @@ def seed_demo(db: Session) -> None:
     db.flush()
     seed_demo_training(db, password)
     seed_demo_requests(db, password)
+    seed_demo_schedules(db, password)
     db.add_all(
         [
             Faq(
@@ -170,6 +208,9 @@ DEMO_JOB_TITLES = {
     "1006": "کارشناس آموزش",
     "1007": "کارشناس شبکه و سخت‌افزار",
     "1008": "تکنسین تأسیسات و تجهیزات",
+    "1009": "مترون",
+    "1010": "سوپروایزر",
+    "1011": "بهیار",
 }
 
 
@@ -282,10 +323,24 @@ def seed_demo_requests(db: Session, password: str) -> None:
     )
 
 
+def seed_demo_schedules(db: Session, password: str) -> None:
+    """مترون (1009)، سوپروایزر (1010) و یک بهیار ICU (1011) برای آزمایش برنامه شیفت و نیروی قرضی."""
+    office = _unit(db, "دفتر پرستاری", "admin")
+    icu = db.scalar(select(Unit).where(Unit.name == "ICU"))
+    _user(db, "1009", "مترون", office, [("matron", None), ("staff", None)], password)
+    _user(db, "1010", "سوپروایزر", office, [("supervisor", None), ("staff", None)], password)
+    _user(db, "1011", "بهیار ICU", icu, [("staff", None)], password)
+    db.flush()
+    for u in db.scalars(select(User).where(User.personnel_code.in_(["1009", "1010", "1011"]))):
+        if not u.job_title:
+            u.job_title = DEMO_JOB_TITLES[u.personnel_code]
+
+
 def run(demo: bool = False) -> None:
     with SessionLocal() as db:
         seed_roles(db)
         seed_forms(db)
+        seed_shift_types(db)
         db.flush()
         seed_bootstrap_admin(db)
         if demo:

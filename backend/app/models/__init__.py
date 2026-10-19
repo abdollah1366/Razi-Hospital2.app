@@ -455,7 +455,7 @@ class Notification(Base):
     kind: Mapped[str] = mapped_column(String(40))
     title: Mapped[str] = mapped_column(String(300))
     body: Mapped[str | None] = mapped_column(String(500))
-    # request | incident | announcement | course | exam
+    # request | incident | announcement | course | exam | chat | schedule
     link_type: Mapped[str | None] = mapped_column(String(20))
     link_id: Mapped[uuid.UUID | None] = mapped_column(index=True)
     important: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -522,3 +522,129 @@ class ChatMessage(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     media: Mapped[MediaFile | None] = relationship(lazy="joined")
+
+
+# ---------------------------------------------------------------- برنامه شیفت بخش‌ها
+
+
+class ShiftType(Base):
+    """کد شیفت بیمارستان (همان شماره فهرست رسمی). کد قدیمی غیرفعال است و replaced_by جایگزینش را می‌گوید."""
+
+    __tablename__ = "shift_types"
+    code: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    title: Mapped[str] = mapped_column(String(300))
+    label: Mapped[str] = mapped_column(String(30))  # برچسب کوتاه جدول، مثلاً «ص ع ش»
+    kind: Mapped[str] = mapped_column(String(10))  # work | off | leave
+    group: Mapped[str] = mapped_column(String(20))  # general | nursing | physician | ...
+    # [{"start": "07:30", "start_day": 0, "end": "08:00", "end_day": 1, "oncall": false}]
+    segments: Mapped[list] = mapped_column(JSONB, default=list)
+    hours: Mapped[float | None] = mapped_column(Float)  # ساعت مصوب، اگر با بازه‌ها فرق دارد
+    productivity: Mapped[bool] = mapped_column(Boolean, default=False)  # بهره‌وری
+    overtime: Mapped[bool | None] = mapped_column(Boolean)  # با یا بدون اضافه‌کار
+    weekday: Mapped[int | None] = mapped_column(Integer)  # فقط یک روز هفته؛ date.weekday()
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    replaced_by: Mapped[int | None] = mapped_column(Integer)
+    review_note: Mapped[str | None] = mapped_column(Text)  # ابهامی که باید بازبینی شود
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class ScheduleUnitSettings(Base):
+    """تنظیمات برنامه یک واحد؛ اگر ردیفی نباشد مقدارهای پیش‌فرض به کار می‌روند."""
+
+    __tablename__ = "schedule_unit_settings"
+    unit_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("units.id", ondelete="CASCADE"), primary_key=True)
+    shift_groups: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    min_staff: Mapped[dict] = mapped_column(JSONB, default=dict)  # {"morning": 3, "evening": 2, "night": 2}
+    max_consecutive: Mapped[int] = mapped_column(Integer, default=6)
+    min_rest_hours: Mapped[int] = mapped_column(Integer, default=8)
+    required_monthly_hours: Mapped[int | None] = mapped_column(Integer)
+    max_monthly_hours: Mapped[int | None] = mapped_column(Integer)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class Holiday(Base):
+    """تعطیل رسمی (جمعه‌ها خودکار تعطیل حساب می‌شوند)."""
+
+    __tablename__ = "holidays"
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    title: Mapped[str] = mapped_column(String(200))
+
+
+class Schedule(TimestampMixin, Base):
+    """برنامه ماهانه یک واحد: draft → submitted → published (یا برگشت به draft)."""
+
+    __tablename__ = "schedules"
+    __table_args__ = (UniqueConstraint("unit_id", "jyear", "jmonth"),)
+    id: Mapped[uuid.UUID] = pk()
+    unit_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("units.id", ondelete="CASCADE"), index=True)
+    jyear: Mapped[int] = mapped_column(Integer)
+    jmonth: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(12), default="draft", index=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    submitted_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reviewed_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    return_note: Mapped[str | None] = mapped_column(String(500))
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ScheduleMember(Base):
+    __tablename__ = "schedule_members"
+    __table_args__ = (UniqueConstraint("schedule_id", "user_id"),)
+    id: Mapped[uuid.UUID] = pk()
+    schedule_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("schedules.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    is_guest: Mapped[bool] = mapped_column(Boolean, default=False)  # نیروی قرضی از واحد دیگر
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class ScheduleEntry(Base):
+    """کد شیفت یک نفر در یک روز (تاریخ میلادی)."""
+
+    __tablename__ = "schedule_entries"
+    __table_args__ = (
+        UniqueConstraint("schedule_id", "user_id", "day"),
+        Index("ix_schedule_entries_user_day", "user_id", "day"),
+    )
+    id: Mapped[uuid.UUID] = pk()
+    schedule_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("schedules.id", ondelete="CASCADE"))
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    day: Mapped[date] = mapped_column(Date, index=True)
+    code: Mapped[int] = mapped_column(ForeignKey("shift_types.code"))
+
+
+class ScheduleChange(Base):
+    """تغییر خانه‌ها پس از انتشار برنامه."""
+
+    __tablename__ = "schedule_changes"
+    id: Mapped[uuid.UUID] = pk()
+    schedule_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("schedules.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    day: Mapped[date] = mapped_column(Date)
+    old_code: Mapped[int | None] = mapped_column(Integer)
+    new_code: Mapped[int | None] = mapped_column(Integer)
+    reason: Mapped[str] = mapped_column(String(300))
+    changed_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ShiftSwap(Base):
+    """جابجایی خانه‌های دو همکار در دو روز: pending_partner → pending_manager → approved، یا rejected/cancelled."""
+
+    __tablename__ = "shift_swaps"
+    id: Mapped[uuid.UUID] = pk()
+    schedule_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("schedules.id", ondelete="CASCADE"), index=True)
+    requester_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    partner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    requester_day: Mapped[date] = mapped_column(Date)
+    partner_day: Mapped[date] = mapped_column(Date)
+    # کدهای دو نفر در دو روز هنگام درخواست؛ اگر تا تأیید عوض شوند، جابجایی کهنه است.
+    snapshot: Mapped[dict] = mapped_column(JSONB, default=dict)
+    note: Mapped[str | None] = mapped_column(String(300))
+    status: Mapped[str] = mapped_column(String(20), default="pending_partner", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    partner_answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    decided_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    decision_note: Mapped[str | None] = mapped_column(String(300))
