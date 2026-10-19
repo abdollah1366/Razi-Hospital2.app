@@ -1,6 +1,6 @@
 /*
  * زنگوله اعلان‌های پنل: شمارنده خوانده‌نشده‌ها (هر ۶۰ ثانیه) و فهرست کشویی.
- * پس از requests.js و پیش از app.js بارگذاری می‌شود (از icon، ago، api و can استفاده می‌کند).
+ * پس از schedules.js و پیش از app.js بارگذاری می‌شود (از icon، ago، api و can استفاده می‌کند).
  */
 "use strict";
 
@@ -17,6 +17,7 @@ const NOTIF_LINKS = {
   course: ["school", "green", (id) => (can("training.manage") ? "#/courses/" + id : null)],
   exam: ["quiz", "amber", (id) => (can("training.manage") ? "#/exams/" + id : null)],
   chat: ["chat", "teal", () => null],
+  schedule: ["calendar", "blue", (id) => (can(["schedule.write", "schedule.approve", "schedule.read.all"]) ? "#/schedules/" + id : null)],
 };
 
 const notif = { count: 0, important: 0, timer: null, panel: null, badges: new Set() };
