@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.FactCheck
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.Notifications
@@ -66,6 +67,7 @@ fun StaffHomeScreen(
     onRequests: () -> Unit,
     onNotifications: () -> Unit,
     onChat: () -> Unit,
+    onSchedule: () -> Unit,
     onPublic: () -> Unit,
     onLogout: () -> Unit,
 ) {
@@ -162,6 +164,7 @@ fun StaffHomeScreen(
                 onChat,
                 badge = chatUnread,
             )
+            MenuTile("برنامه شیفت", "شیفت‌های من، برنامه بخش و جابجایی", Icons.Filled.CalendarMonth, onSchedule)
             MenuTile("خدمات عمومی بیمارستان", "راهنمای بخش‌ها، پرسش‌ها و شکایات", Icons.Filled.Public, onPublic)
             Text(
                 "بخش پژوهش در مراحل بعدی اضافه می‌شود.",

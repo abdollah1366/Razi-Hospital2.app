@@ -13,6 +13,7 @@ sealed interface NotificationTarget {
     data class Chat(val id: String) : NotificationTarget
     data object Announcements : NotificationTarget
     data object Training : NotificationTarget
+    data class Schedule(val id: String?) : NotificationTarget
 }
 
 /** منطق خالص اعلان‌ها (بدون اندروید) تا با تست واحد آزموده شود. */
@@ -28,6 +29,7 @@ object NotificationLogic {
         "incident" -> linkId?.let { NotificationTarget.Incident(it) }
         "course" -> linkId?.let { NotificationTarget.Course(it) }
         "announcement" -> NotificationTarget.Announcements
+        "schedule" -> NotificationTarget.Schedule(linkId)
         "chat" -> linkId?.let { NotificationTarget.Chat(it) }
         // آزمون از صفحه آموزش شروع می‌شود تا کاربر پیش از شروع، زمان و شرایط را ببیند.
         "exam" -> NotificationTarget.Training
