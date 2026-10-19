@@ -17,6 +17,7 @@ from app.routers import (
     notifications,
     public,
     requests,
+    schedules,
     training,
 )
 
@@ -74,6 +75,7 @@ def create_app() -> FastAPI:
         requests.router,
         notifications.router,
         chat.router,
+        schedules.router,
     ):
         app.include_router(r, prefix=API_PREFIX)
 

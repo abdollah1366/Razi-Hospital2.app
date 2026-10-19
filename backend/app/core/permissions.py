@@ -28,6 +28,11 @@ PERMISSIONS: dict[str, str] = {
     # خود گفتگو برای همه کاربران فعال است؛ این دو فقط ساخت گروه و نوشتن در کانال واحد را باز می‌کنند.
     "chat.group.create": "ساخت گروه گفتگو",
     "chat.unit.post": "نوشتن در کانال گفتگوی واحد",
+    # دیدن برنامه خود و برنامه منتشرشده بخش خود برای همه کاربران فعال است.
+    "schedule.write": "نوشتن و تغییر برنامه شیفت واحد و تأیید جابجایی‌ها",
+    "schedule.approve": "تأیید یا برگرداندن برنامه شیفت واحدها",
+    "schedule.read.all": "دیدن برنامه شیفت همه واحدها و کشیک امروز",
+    "schedule.config": "تعریف کدهای شیفت، تعطیلات و تنظیمات برنامه واحدها",
 }
 
 DEFAULT_ROLES: dict[str, tuple[str, list[str]]] = {
@@ -43,6 +48,7 @@ DEFAULT_ROLES: dict[str, tuple[str, list[str]]] = {
             "request.read",
             "chat.group.create",
             "chat.unit.post",
+            "schedule.write",
         ],
     ),
     "patient_safety": (
@@ -83,6 +89,22 @@ DEFAULT_ROLES: dict[str, tuple[str, list[str]]] = {
         "مدیر ارشد",
         ["announcement.read", "dashboard.read", "training.read", "request.create", "request.read"],
     ),
+    # مترون (دفتر پرستاری). اگر با واحد انتساب داده شود، فقط برنامه همان واحد را تأیید می‌کند.
+    "matron": (
+        "مترون",
+        [
+            "announcement.read",
+            "training.read",
+            "request.create",
+            "schedule.approve",
+            "schedule.read.all",
+            "schedule.config",
+        ],
+    ),
+    "supervisor": (
+        "سوپروایزر",
+        ["announcement.read", "training.read", "request.create", "schedule.read.all"],
+    ),
     "auditor": ("حسابرس", ["audit.read"]),
     # مدیر سیستم عمداً به محتوای گزارش‌های خطا دسترسی ندارد.
     "sysadmin": (
@@ -94,6 +116,7 @@ DEFAULT_ROLES: dict[str, tuple[str, list[str]]] = {
             "announcement.read",
             "request.type.manage",
             "chat.group.create",
+            "schedule.config",
         ],
     ),
 }
